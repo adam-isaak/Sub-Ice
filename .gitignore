@@ -13,6 +13,7 @@
 !functions/knee_pt.m
 !functions/lines_to_shp.m
 !functions/profile_query_pts.m
+!functions/validate_profiles.m
 !input/
 !input/venable.tif
 !input/venable.tif_credit.txt

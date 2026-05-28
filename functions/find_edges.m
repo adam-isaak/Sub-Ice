@@ -1,4 +1,4 @@
-function [edge_idx, edge_coord, edge_elev, alongprof] = find_edges(profiles, x_prof, y_prof, res, varargin)
+function [edge_idx, edge_coord, edge_elev, alongprof, is_peak] = find_edges(profiles, x_prof, y_prof, res, varargin)
 %[edge_idx, edge_coord, edge_elev] = find_edges(profiles, x_prof, y_prof,
 %res, edge_method, slope_thr, slope_thr, min_width, max_width, peak_prom, sg_window, m_window)
 %
@@ -148,6 +148,8 @@ lelev = NaN(no_profs, 1);        % channel elevation at left edge of profile [m]
 rx = NaN(no_profs, 1);           % right edge x coord [pix]
 ry = NaN(no_profs, 1);           % right edge y coord [pix]
 relev = NaN(no_profs, 1);        % channel elevation at right edge of profile [m]
+is_peak = false(no_profs, 2);
+
 % left/right is correct when looking from START to END
 
 % smoothing array
@@ -242,15 +244,16 @@ for i = 1:no_profs
         rprof = prof(1:no_pts-rmin_width);
 
         % find the peaks along the right channel edge
-        [~, pk] = findpeaks(rprof((no_pts-rmax_width):end), MinPeakProminence=peak_prom);
+        [~, pk] = findpeaks(rprof((out_th):end), MinPeakProminence=peak_prom);
 
         if isempty(pk)                                  % if no peaks are found
             [~, idx] = knee_pt(rprof(out_th:end));      % find the knee point in the search area
             redge_idx(i) = idx+out_th;                  
             redge_sm(i) = true;                         % set as filterable
+            is_peak(i, 2) = true;
         else
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            redge_idx(i) = idx;                         
+            idx = ceil(pk(end)-1);                 % find the index of the peak
+            redge_idx(i) = idx+out_th;                         
             redge_sm(i) = false;                        % set to preserve during filtering
         end 
 
@@ -267,50 +270,10 @@ for i = 1:no_profs
             [~, idx] = knee_pt(lprof(out_th:end));      % find the knee point in the search area
             idx = prof_length+1 - (idx+out_th);         % profile was flipped! correcting for that:
             ledge_sm(i) = true;                         % set as filterable
+            is_peak(i, 1) = true;
         else                                            
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            idx = prof_length+1 - idx;                  % profile was flipped! correcting for that:
-            ledge_sm(i) = false;                        % set to preserve during filtering
-        end 
-
-        ledge_idx(i) = idx;
-
-    elseif edge_method == "NearPeaks"
-
-        % right channel edge
-        out_th = no_pts-rmax_width;      % index of outer threshold
-
-        rprof = prof(1:no_pts-rmin_width);
-
-        % find the peaks along the right channel edge
-        [~, pk] = findpeaks(rprof((no_pts-rmax_width):end), MinPeakProminence=peak_prom);
-
-        if isempty(pk)                                  % if no peaks are found
-            [~, idx] = knee_pt(rprof(out_th:end));      % find the knee point in the search area
-            redge_idx(i) = idx+out_th;                  
-            redge_sm(i) = true;                         % set as filterable
-        else
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            redge_idx(i) = idx;                         
-            redge_sm(i) = false;                        % set to preserve during filtering
-        end 
-
-        % left channel edge
-        out_th = no_pts-lmax_width;      % index of outer threshold
-        
-        lprof = flip(prof); 
-        lprof = lprof(1:no_pts-lmin_width);
-
-        % find the peaks along the left channel edge
-        [~, pk] = findpeaks(lprof(out_th:end), MinPeakProminence=peak_prom);
-
-        if isempty(pk)                                  % if no peaks are found
-            [~, idx] = knee_pt(lprof(out_th:end));      % find the knee point in the search area
-            idx = prof_length+1 - (idx+out_th);         % profile was flipped! correcting for that:
-            ledge_sm(i) = true;                         % set as filterable
-        else                                            
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            idx = prof_length+1 - idx;                  % profile was flipped! correcting for that:
+            idx = ceil(pk(end)-1);                 % find the index of the peak
+            idx = prof_length+1 - (idx+out_th);                  % profile was flipped! correcting for that:
             ledge_sm(i) = false;                        % set to preserve during filtering
         end 
 
