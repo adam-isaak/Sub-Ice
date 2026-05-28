@@ -211,7 +211,7 @@ for i = 1:no_profs
         end
 
         % profile slope was flipped! correcting for that:
-        idx = prof_length+1 - idx;
+        idx = prof_length - idx;
         ledge_idx(i) = idx;
         % clamp to min/max width
         if lmin_width > 0; ledge_idx(i) = max(ledge_idx(i), no_pts + lmin_width); end
@@ -268,7 +268,7 @@ for i = 1:no_profs
 
         if isempty(pk)                                  % if no peaks are found
             [~, idx] = knee_pt(lprof(out_th:end));      % find the knee point in the search area
-            idx = prof_length+1 - (idx+out_th);         % profile was flipped! correcting for that:
+            idx = prof_length - (idx+out_th);         % profile was flipped! correcting for that:
             ledge_sm(i) = true;                         % set as filterable
             is_peak(i, 1) = true;
         else                                            
