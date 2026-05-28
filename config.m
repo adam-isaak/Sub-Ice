@@ -72,6 +72,8 @@ slope_thr = 0.00;                 % slope threshold for identifying edge [deg] (
 peak_prom = 1;                  % MinPeakProm for findpeaks() [m], minimum prominence for channel edge (only used when edge_method = "NearPeaks")
 keep_pks = 0;                     % prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 
+% profile validation parameters
+frac_error = 25;                  % Percentage of the average channel depth, any edges that fall under should be removed
 
 %% manage directories
 %  (no need to update)

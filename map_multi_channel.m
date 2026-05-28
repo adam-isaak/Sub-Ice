@@ -244,7 +244,7 @@ for c = 1:no_channels
                                                 'peak_prom',        peak_prom, ...
                                                 'keep_pks',         keep_pks); 
     
-    [keep_prof] = validate_profiles(profiles{c}, edge_elev{c}, 'frac_error', 25);
+    [keep_prof] = validate_profiles(profiles{c}, edge_elev{c}, 'frac_error', frac_error);
 
     % vizualise
     % centerlines
