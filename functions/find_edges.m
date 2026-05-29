@@ -242,15 +242,15 @@ for i = 1:no_profs
         rprof = prof(1:no_pts-rmin_width);
 
         % find the peaks along the right channel edge
-        [~, pk] = findpeaks(rprof((no_pts-rmax_width):end), MinPeakProminence=peak_prom);
+        [~, pk] = findpeaks(rprof(out_th:end), MinPeakProminence=peak_prom);
 
         if isempty(pk)                                  % if no peaks are found
             [~, idx] = knee_pt(rprof(out_th:end));      % find the knee point in the search area
             redge_idx(i) = idx+out_th;                  
             redge_sm(i) = true;                         % set as filterable
         else
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            redge_idx(i) = idx;                         
+            idx = ceil(pk(end)-1);                 % find the index of the peak
+            redge_idx(i) = idx+out_th;                         
             redge_sm(i) = false;                        % set to preserve during filtering
         end 
 
@@ -268,8 +268,8 @@ for i = 1:no_profs
             idx = prof_length - (idx+out_th);         % profile was flipped! correcting for that:
             ledge_sm(i) = true;                         % set as filterable
         else                                            
-            idx = ceil(pk(end)+out_th);                 % find the index of the peak
-            idx = prof_length - idx;                  % profile was flipped! correcting for that:
+            idx = ceil(pk(end)-1);                 % find the index of the peak
+            idx = prof_length - (idx+out_th);                  % profile was flipped! correcting for that:
             ledge_sm(i) = false;                        % set to preserve during filtering
         end 
 
