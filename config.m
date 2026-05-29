@@ -73,7 +73,8 @@ peak_prom = 1;                  % MinPeakProm for findpeaks() [m], minimum promi
 keep_pks = 0;                     % prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 
 % profile validation parameters
-frac_error = 25;                  % Percentage of the average channel depth, any edges that fall under should be removed
+enable_validation = 0;            % Enables or disables all the validation operations
+frac_error = 5;                  % Percentage of the average channel depth, any edges that fall under should be removed [%] (0-100 inclusive)
 
 %% manage directories
 %  (no need to update)

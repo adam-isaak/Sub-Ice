@@ -233,7 +233,7 @@ for c = 1:no_channels
     [profiles{c}, x_prof{c}, y_prof{c}] = find_profiles(x_cent{c}, y_cent{c}, DEM, R, ...
                                                 'prof_length',      prof_length, ...
                                                 'prof_interval',    prof_interval);
-    no_profiles = size(profiles, 2); 
+    no_profiles = size(profiles{c}, 2); 
 
     % find channel edges/outlines
     [edge_idx{c}, edge_coord{c}, edge_elev{c}, ~, is_peak] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
@@ -243,8 +243,11 @@ for c = 1:no_channels
                                                 'max_width',        max_width, ...
                                                 'peak_prom',        peak_prom, ...
                                                 'keep_pks',         keep_pks); 
-    
-    [keep_prof] = validate_profiles(profiles{c}, edge_elev{c}, 'frac_error', frac_error);
+    if enable_validation
+        [keep_prof] = validate_profiles(profiles{c}, edge_elev{c}, 'frac_error', frac_error);
+    else
+        keep_prof = true(no_profiles, 1);
+    end 
 
     % vizualise
     % centerlines
