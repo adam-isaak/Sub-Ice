@@ -243,11 +243,10 @@ for c = 1:no_channels
                                                 'max_width',        max_width, ...
                                                 'peak_prom',        peak_prom, ...
                                                 'keep_pks',         keep_pks); 
-    if enable_validation
-        [keep_prof] = validate_profiles(profiles{c}, edge_elev{c}, 'frac_error', frac_error);
-    else
-        keep_prof = true(no_profiles, 1);
-    end 
+   
+    % validate all cross sections
+    [keep_prof] = validate_profiles(profiles{c}, res, edge_elev{c}, ... 
+                                                'validation_methods', validation_methods);
 
     % vizualise
     % centerlines

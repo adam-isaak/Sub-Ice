@@ -59,7 +59,7 @@ max_recursions = 1000;               % keep trying with slightly different searc
 
 % channel cross sectional profile parameters
 prof_length   = 10000;            % length of cross sectional profiles [m]
-prof_interval = 250;                % spacing between profiles along centerline [m]
+prof_interval = 0;                % spacing between profiles along centerline [m]
                                   % (0 = one profile per centerline search segment)
 % channel edge parameters
 edge_method = "NearPeaks";        % method to use to identify channel edges ("SlopeThreshold", "KneePoint" or "NearPeaks")
@@ -73,8 +73,7 @@ peak_prom = 1;                  % MinPeakProm for findpeaks() [m], minimum promi
 keep_pks = 0;                     % prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 
 % profile validation parameters
-enable_validation = 0;            % Enables or disables all the validation operations
-frac_error = 5;                  % Percentage of the average channel depth, any edges that fall under should be removed [%] (0-100 inclusive)
+validation_methods = [];          % validation methods for the cross section ("FractureThreshold", "MaxPeakTrough", or "TroughThreshold", set empty for no validation)
 
 %% manage directories
 %  (no need to update)
