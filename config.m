@@ -73,7 +73,7 @@ peak_prom = 1;                  % MinPeakProm for findpeaks() [m], minimum promi
 keep_pks = 0;                     % prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 
 % profile validation parameters
-validation_methods = [];          % validation methods for the cross section ("FractureThreshold", "MaxPeakTrough", or "TroughThreshold", set empty for no validation)
+validation_methods = [];          % validation methods for the cross section ("FractureThreshold", "MaxPeakTrough", or "TroughThreshold", set empty for no validation, set "all" to run all of them)
 
 %% manage directories
 %  (no need to update)

@@ -17,7 +17,7 @@ function [keep_prof] = validate_profiles(profiles, res, edge_elev, varargin)
 % edge_elev = matrix containing each profiles left and right elevation [m]
 %
 % optional inputs
-% validation_methods = methods to validate the profiles ("FractureThreshold", "MaxPeakTrough", "TroughThreshold")
+% validation_methods = methods to validate the profiles ("FractureThreshold", "MaxPeakTrough", or "TroughThreshold", "all" runs all the validation methods)
 % frac_error = error threshold for fractures [%], the percentage below which a profile should excluded based on the average depth from edge the centre
 % tr_min = percentage of elevation [%] below the channel that a profile will be excluded by if the average trough elevation falls below
 % peak_prom = prominence of detecting excess peaks and troughs [m] (default: 2m)
@@ -37,7 +37,7 @@ default_max_num_tr = 2;
 
 % parse input arguments
 p = inputParser; 
-validValidationMethod = @(x) isempty(x) || ~isempty(ismember(x, ["FractureThreshold", "MaxPeakTrough", "TroughThreshold"]));
+validValidationMethod = @(x) isempty(x) || ((isstring(x) && any(ismember(string(x), ["all", "FractureThreshold", "MaxPeakTrough", "TroughThreshold"]))));
 validPercent = @(x) isnumeric(x) && isscalar(x) && x >= 0 && x <= 100;
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x) && (x >= 0);
 addRequired(p, 'profiles');
@@ -71,6 +71,11 @@ if peak_w == 0
     peak_w = 3*res;
 end
 
+% cast the validation methods to a string if they are empty
+if isempty(validation_methods) 
+    validation_methods = string(validation_methods);
+end 
+
 no_profs = size(profiles, 2);
 prof_length = size(profiles, 1);
 check = true(no_profs, 1);
@@ -90,7 +95,7 @@ for i = 1:no_profs
     %% Maximum Peaks and Troughs
     % discards any profiles where the number of peaks and/or troughs exceed
     % the number of expected.
-    if any(ismember(validation_methods, 'MaxPeakTrough'))
+    if any(ismember(validation_methods, ["MaxPeakTrough", "all"]))
         if ((length(pk_elev) > max_num_pk) || (length(tr_elev) > max_num_tr)) && check(i)
             check(i) = false;
         end
@@ -100,7 +105,7 @@ for i = 1:no_profs
     % check to see if the average elevation of the trough exceed the
     % threshold percentage of elevation below the channel elevation to
     % detect profiles that dip too much below the channel base
-    if any(ismember(validation_methods, 'TroughThreshold'))
+    if any(ismember(validation_methods, ["TroughThreshold", "all"]))
         avg_tr = mean(-tr_elev);
         if avg_tr < (channel_elev - channel_elev * tr_min) && check(i)
             check(i) = false;
@@ -112,7 +117,7 @@ for i = 1:no_profs
     % difference between adjacent profiles for both the left and right 
     % edge and the channel base and seeing if they exceed it based on a set
     % error threshold
-    if any(ismember(validation_methods, 'FractureThreshold'))
+    if any(ismember(validation_methods, ["FractureThreshold", "all"]))
         % find the average elevation for the current profile and its
         % adjacent profiles
         if (i > 1 && i < no_profs)
