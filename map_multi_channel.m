@@ -236,7 +236,7 @@ for c = 1:no_channels
     no_profiles = size(profiles{c}, 2); 
 
     % find channel edges/outlines
-    [edge_idx{c}, edge_coord{c}, edge_elev{c}, ~, is_peak] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
+    [edge_idx{c}, edge_coord{c}, edge_elev{c}, ~, is_peak{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
                                                 'edge_method',      'NearPeaks', ...
                                                 'm_window',         m_window, ...
                                                 'min_width',        min_width, ...
@@ -245,7 +245,7 @@ for c = 1:no_channels
                                                 'keep_pks',         keep_pks); 
    
     % validate all cross sections
-    [keep_prof] = validate_profiles(profiles{c}, res, edge_elev{c}, ... 
+    [keep_prof{c}] = validate_profiles(profiles{c}, res, edge_elev{c}, ... 
                                                 'validation_methods', validation_methods);
 
     % vizualise
@@ -258,8 +258,8 @@ for c = 1:no_channels
     plot(edge_coord{c}(:,1), edge_coord{c}(:,2), 'g')
     plot(edge_coord{c}(:,3), edge_coord{c}(:,4), 'g')
     % profile transects
-    scatter(x_prof{c}(:, keep_prof), y_prof{c}(:, keep_prof), 2, 'w')
-    scatter(x_prof{c}(:, ~keep_prof), y_prof{c}(:, ~keep_prof), 2, 'b')
+    scatter(x_prof{c}(:, keep_prof{c}), y_prof{c}(:, keep_prof{c}), 2, 'w')
+    scatter(x_prof{c}(:, ~keep_prof{c}), y_prof{c}(:, ~keep_prof{c}), 2, 'b')
     % annotation
     text(P_start(c,1) + text_offs, P_start(c,2) + text_offs, channel_label(c), 'Color', 'm')
     pause(0.01) % just to force matlab to plot
@@ -329,12 +329,12 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
     for c = 1:no_channels
         
         all_profiles = profiles{c};
-        profiles{c} = all_profiles(:, keep_prof);
+        profiles{c} = all_profiles(:, keep_prof{c});
         all_edge_idx = edge_idx{c};
-        edge_idx{c} = all_edge_idx(keep_prof, :);
+        edge_idx{c} = all_edge_idx(keep_prof{c}, :);
         all_edge_elev = edge_elev{c};
-        edge_elev{c} = all_edge_elev(keep_prof, :);
-        is_peak = is_peak(keep_prof, :);
+        edge_elev{c} = all_edge_elev(keep_prof{c}, :);
+        is_peak{c} = is_peak{c}(keep_prof{c}, :);
 
         % cross sectional profiles
         no_profiles = size(profiles{c}, 2); 
@@ -358,8 +358,8 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         set(gca(), 'ColorOrder', cmap)
         hcb = colorbar; 
         title(hcb, 'norm. dist. along channel [-]')
-        plot(edge_pos_vector(is_peak), edge_elev{c}(is_peak), 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
-        plot(edge_pos_vector(~is_peak), edge_elev{c}(~is_peak), 'o', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'g', 'MarkerSize', 7)
+        plot(edge_pos_vector(is_peak{c}), edge_elev{c}(is_peak{c}), 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
+        plot(edge_pos_vector(~is_peak{c}), edge_elev{c}(~is_peak{c}), 'o', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'g', 'MarkerSize', 7)
 
         if save_figs
             fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev'); 
