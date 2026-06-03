@@ -21,7 +21,7 @@ function [keep_prof] = validate_profiles(profiles, res, edge_elev, varargin)
 % frac_error = error threshold for fractures [%], the percentage below which a profile should excluded based on the average depth from edge the centre
 % tr_min = percentage of elevation [%] below the channel that a profile will be excluded by if the average trough elevation falls below
 % peak_prom = prominence of detecting excess peaks and troughs [m] (default: 2m)
-% peak_w = width of the peak for detecting excess peaks and troughs [m] (default: 0, set to 0 it uses 3 times res)
+% peak_w = width of the peak for detecting excess peaks and troughs [m] (default: 0, set to 0 it uses the res [m])
 % max_num_pk = max number of peaks before discarding [-] (default: 3)
 % max_num_tr = max number of troughs before discarding [-] (default: 2)
 
@@ -68,7 +68,7 @@ tr_min = tr_min/100;
 
 % set the default peak width if unset
 if peak_w == 0
-    peak_w = 3*res;
+    peak_w = res;
 end
 
 % cast the validation methods to a string if they are empty
