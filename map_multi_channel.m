@@ -250,6 +250,7 @@ for c = 1:no_channels
 
     % vizualise
     % centerlines
+    hold on
     scatter(x_cent{c}, y_cent{c}, 15, 'r', 'filled')
     plot(x_cent{c}, y_cent{c}, 'r')
     % outlines
