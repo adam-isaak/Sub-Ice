@@ -204,9 +204,7 @@ edge_coord = cell(no_channels, 1);
 edge_elev = cell(no_channels, 1); 
 fchannel = cell(no_channels, 1);
 
-thresh_idx = cell(no_channels, 1); % TEST
-
-% to store whether we successfully found the channel centerline: 
+% to store whether we "successfully" found the channel centerline: 
 channel_status = zeros(no_channels, 1); 
 
 % loop over channels
@@ -236,11 +234,13 @@ for c = 1:no_channels
     no_profiles = size(profiles{c}, 2); 
 
     % find channel edges/outlines
-    [edge_idx{c}, edge_coord{c}, edge_elev{c}, ~, is_peak{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
-                                                'edge_method',      'NearPeaks', ...
-                                                'm_window',         m_window, ...
+    [edge_idx{c}, edge_coord{c}, edge_elev{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
+                                                'edge_method',      edge_method, ...
                                                 'min_width',        min_width, ...
                                                 'max_width',        max_width, ...
+                                                'sg_window',        sg_window, ... 
+                                                'm_window',         m_window, ...
+                                                'slope_thr',        slope_thr, ... 
                                                 'peak_prom',        peak_prom, ...
                                                 'keep_pks',         keep_pks); 
    
@@ -353,7 +353,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         plot(prof_dist_vector, profiles{c}, 'LineWidth', 3)
         xlabel('distance from profile center [m]')
         ylabel('elevation [m]')
-        title('channel cross sectional profiles (full, abs. heights)')
+        title(append(channel_label(c), ' cross sectional profiles (full, abs. heights)'))
         % color gradient
         cmap = parula(no_profiles); 
         set(gca(), 'ColorOrder', cmap)
@@ -384,7 +384,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         end
         xlabel('distance from profile center [m]')
         ylabel('depth [m]')
-        title('channel cross sectional profiles (depth below left edge)')
+        title(append(channel_label(c), ' channel cross sectional profiles (depth below left edge)'))
         cmap = parula(no_profiles); 
         set(gca(), 'ColorOrder', cmap)
         hcb = colorbar; 

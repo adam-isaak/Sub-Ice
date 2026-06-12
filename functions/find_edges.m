@@ -244,7 +244,7 @@ for i = 1:no_profs
         rprof = prof(1:no_pts-rmin_width);
 
         % find the peaks along the right channel edge
-        [~, pk] = findpeaks(rprof((out_th):end), MinPeakProminence=peak_prom);
+        [~, pk] = findpeaks(rprof(out_th:end), MinPeakProminence=peak_prom);
 
         if isempty(pk)                                  % if no peaks are found
             [~, idx] = knee_pt(rprof(out_th:end));      % find the knee point in the search area
