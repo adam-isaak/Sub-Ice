@@ -7,23 +7,20 @@ function [res_x, idx_of_result] = knee_pt(y, varargin)
 % required inputs:
 % y = vector of the y value, must be larger 
 %
-% optional inputs
-% x = vector of x values the same size as y
+% optional inputs:
+% x = vector of x values the same size as y (default: incremental array of
+% same size as y)
 % knee_method = method used to detect knee point,  "SegLinReg" or "Kneedle" (default: "Kneedle")
 %
 %
-% Important:  The x and y  don't need to be sorted, they just have to
-% correspond: knee_pt([1,2,3],[3,4,5]) = knee_pt([3,1,2],[5,3,4])
+% Important:  
+%  The x and y  don't need to be sorted, they just have to
+%  correspond: knee_pt([1,2,3],[3,4,5]) = knee_pt([3,1,2],[5,3,4])
 %
-% Important: Because of the way the function operates y must be at least 3
-% elements long and the function will never return either the first or the
-% last point as the answer.
+%  Because of the way the function operates y must be at least 3
+%  elements long and the function will never return either the first or the
+%  last point as the answer.
 %
-% Defaults:
-% If x is not specified or is empty, it's assumed to be 1:length(y) -- in
-% this case both returned values are the same.
-% If knee_method is not specified, or an invalid string it's assumed to be
-% "Kneedle"
 %
 % The "Kneedle" method operates using a Kneedle algorithm, which draws a line
 % between the start and end points, then draws perpendicular lines from
@@ -99,7 +96,7 @@ if ~all(size(x) == size(y))
     error('knee_pt: y and x must have the same dimensions');
 end
 
-% actual function
+%% actual function
 
 %set internal operation flags
 use_absolute_dev_p = true;  %ow quadratic
@@ -162,24 +159,26 @@ if knee_method == "SegLinReg"
 elseif knee_method == "Kneedle"
     line_dist = nan(size(y));
 
-    % find the line
+    % find the line in the y=mx+b
     start_pos_x = x(1);
     start_pos_y = y(1);
     end_pos_x = x(end);
     end_pos_y = y(end);
     m = (end_pos_y - start_pos_y)/(end_pos_x - start_pos_x);
     b = start_pos_y - m*(start_pos_x);
-    theta = (pi()/180) - atan(m);
+
+    % calculate the angle between the line and each cross section point
+    theta = (pi()/2) - atan(m);
     
     % for each calculate the length of each perpendicular line from
-    % start-end line to the point
+    % start-end line back to the current cross section point
     for i = 2:(length(y)-1)
         tri_pos = (m*x(i))+b;
         h = y(i) - tri_pos;
         line_dist(i) = sin(theta)*h;
     end
 
-    % return location of the point which has the longest line  
+    % return index of the point with the longest perpendicular line 
     [~, loc] = max(line_dist);
     res_x = x(loc);
     idx_of_result = idx(loc);

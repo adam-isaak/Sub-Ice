@@ -335,7 +335,6 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         edge_idx{c} = all_edge_idx(keep_prof{c}, :);
         all_edge_elev = edge_elev{c};
         edge_elev{c} = all_edge_elev(keep_prof{c}, :);
-        is_peak{c} = is_peak{c}(keep_prof{c}, :);
 
         % cross sectional profiles
         no_profiles = size(profiles{c}, 2); 
@@ -359,9 +358,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         set(gca(), 'ColorOrder', cmap)
         hcb = colorbar; 
         title(hcb, 'norm. dist. along channel [-]')
-        plot(edge_pos_vector(is_peak{c}), edge_elev{c}(is_peak{c}), 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
-        plot(edge_pos_vector(~is_peak{c}), edge_elev{c}(~is_peak{c}), 'o', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'g', 'MarkerSize', 7)
-
+        plot(edge_pos_vector, edge_elev{c}, 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
         if save_figs
             fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev'); 
             print(fn, figs_filetype, figs_resolution)
