@@ -34,6 +34,7 @@ function [edge_idx, edge_coord, edge_elev, alongprof, is_peak] = find_edges(prof
 % sg_window = window size for profile smoothing [m] (will be rounded, set to 0 for no smoothing)
 % m_window = window size for edge smoothing [-] (no. of profile edges, set to 0 for no smoothing)
 % keep_peaks = prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
+% knee_method = method used in the knee point detection ("SegLinReg" or the default "Kneedle")
 %
 % output: 
 % edge_idx = matrix containing profile indices corr. to channel edges [-]
@@ -68,6 +69,7 @@ default_peak_prom = 1;
 default_sg_window = 0; 
 default_m_window = 0; 
 default_edge_method = "KneePoint";
+default_knee_method = "Kneedle";
 default_keep_pks = false;
 
 % parse input arguments
@@ -75,6 +77,7 @@ p = inputParser;
 validScalarPosNum = @(x) isnumeric(x) && isscalar(x); % && (x >= 0);
 validMaxMinWidths = @(x) (isvector(x) && all(x(:) >= 0) && length(x) == 2) || (isnumeric(x) && isscalar(x) && (x >= 0));
 validEdgeMethod = @(x) convertCharsToStrings(x)=="SlopeThreshold" | convertCharsToStrings(x)=="KneePoint" | convertCharsToStrings(x)=="NearPeaks";
+validKneeMethod = @(x) convertCharsToStrings(x)=="SegLinReg" | convertCharsToStrings(x)=="Kneedle";
 addRequired(p, 'profiles')
 addRequired(p, 'x_prof')
 addRequired(p, 'y_prof')
@@ -86,6 +89,7 @@ addOptional(p, 'peak_prom', default_peak_prom, validScalarPosNum)
 addOptional(p, 'sg_window', default_sg_window, validScalarPosNum)
 addOptional(p, 'm_window', default_m_window, validScalarPosNum)
 addOptional(p, 'edge_method', default_edge_method, validEdgeMethod)
+addOptional(p, 'knee_method', default_knee_method, validKneeMethod);
 addOptional(p, 'keep_pks', default_keep_pks, validScalarPosNum)
 parse(p, profiles, x_prof, y_prof, res, varargin{:}); 
 
@@ -96,6 +100,7 @@ peak_prom = p.Results.peak_prom;
 sg_window = p.Results.sg_window; 
 m_window = p.Results.m_window; 
 edge_method = convertCharsToStrings(p.Results.edge_method);
+knee_method = convertCharsToStrings(p.Results.knee_method);
 keep_pks = p.Results.keep_pks;
 
 
@@ -222,7 +227,7 @@ for i = 1:no_profs
         % right channel edge
         rprof = prof(1:no_pts);
         rprof = flip(rprof);
-        [~, idx] = knee_pt(rprof);
+        [~, idx] = knee_pt(rprof, 'knee_method', knee_method);
         % profile was flipped, correcting for that:
         redge_idx(i) = no_pts - idx;
         % clamp to min/max width
@@ -231,7 +236,7 @@ for i = 1:no_profs
 
         % left channel edge
         lprof = prof(no_pts:end);
-        [~, idx] = knee_pt(lprof);
+        [~, idx] = knee_pt(lprof, 'knee_method', knee_method);
         ledge_idx(i) = no_pts + idx;
         % clamp to min/max width
         if lmin_width > 0; ledge_idx(i) = max(ledge_idx(i), no_pts + lmin_width); end
@@ -247,7 +252,7 @@ for i = 1:no_profs
         [~, pk] = findpeaks(rprof(out_th:end), MinPeakProminence=peak_prom);
 
         if isempty(pk)                                  % if no peaks are found
-            [~, idx] = knee_pt(rprof(out_th:end));      % find the knee point in the search area
+            [~, idx] = knee_pt(rprof(out_th:end), 'knee_method', knee_method);      % find the knee point in the search area
             redge_idx(i) = idx+out_th;                  
             redge_sm(i) = true;                         % set as filterable
             is_peak(i, 2) = true;
@@ -267,7 +272,7 @@ for i = 1:no_profs
         [~, pk] = findpeaks(lprof(out_th:end), MinPeakProminence=peak_prom);
 
         if isempty(pk)                                  % if no peaks are found
-            [~, idx] = knee_pt(lprof(out_th:end));      % find the knee point in the search area
+            [~, idx] = knee_pt(lprof(out_th:end), 'knee_method', knee_method);      % find the knee point in the search area
             idx = prof_length - (idx+out_th);         % profile was flipped! correcting for that:
             ledge_sm(i) = true;                         % set as filterable
             is_peak(i, 1) = true;
