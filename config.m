@@ -66,14 +66,14 @@ edge_method = "NearPeaks";        % method to use to identify channel edges ("Sl
 min_width = [250, 250];                  % minimum channel width [m] (set to 0 for no minimum width)
 max_width = [2000, 2000];                    % maximum channel width [m] (set to 0 for maximum width = prof_length)
 sg_window = 1000;                 % window size for profile smoothing [m] (will be rounded up to [pix], set to 0 for no smoothing, Savitzky-Golay filter)
-m_window = 0;                     % window size for edge smoothing [-] (no. of profile edges, set to 0 for no smoothing, median filter)
+m_window = 10;                     % window size for edge smoothing [-] (no. of profile edges, set to 0 for no smoothing, median filter)
 
 slope_thr = 0.00;                 % slope threshold for identifying edge [deg] (only used when edge_method = "SlopeThreshold")
 peak_prom = 1;                  % MinPeakProm for findpeaks() [m], minimum prominence for channel edge (only used when edge_method = "NearPeaks")
 keep_pks = 0;                     % prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 
 % profile validation parameters
-validation_methods = [];          % validation methods for the cross section ("FractureThreshold", "MaxPeakTrough", or "TroughThreshold", set empty for no validation, set "all" to run all of them)
+validation_methods = ["all"];          % validation methods for the cross section ("EdgeThreshold", "MaxPeakTrough", or "AlongOutliers", set empty for no validation, set "all" to run all of them)
 
 %% manage directories
 %  (no need to update)
