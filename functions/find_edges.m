@@ -34,7 +34,6 @@ function [edge_idx, edge_coord, edge_elev, valid_edges, alongprof] = find_edges(
 % peak_prom = hMinPeakProm for findpeaks() [m], minimum prominence for channel edge (only used when edge_method = "NearPeaks")
 % sg_window = window size for profile smoothing [m] (will be rounded, set to 0 for no smoothing)
 % m_window = window size for edge smoothing [-] (no. of profile edges, set to 0 for no smoothing)
-% keep_peaks = prevent peaks from being adjusted by along-channel edge smoothing (0 or 1, only used when edge_method = "NearPeaks")
 % 
 % optional input related to z-score outliers: 
 % z_thr_elev =  z-score outlier threshold, elevation of edge (set to 0 to skip outlier identification, default: 0)
@@ -42,6 +41,7 @@ function [edge_idx, edge_coord, edge_elev, valid_edges, alongprof] = find_edges(
 % z_thr_idx =   z-score outlier threshold, profile index of edge (set to 0 to skip outlier identification, default: 0)
 %               optional: [left_thr right_thr] to use different thresholds for the left and right edge
 % edge_subst_window = window size for outlier substitution (moving median filter, set to 0 to leave out outliers altogether, default: 5)  
+% knee_method = method used in the knee point detection ("LinearRegression" or the default "Kneedle")
 %
 % output: 
 % edge_idx = matrix containing profile indices corr. to channel edges [-]
@@ -103,6 +103,7 @@ addOptional(p, 'peak_prom', default_peak_prom, validScalarPosNum)
 addOptional(p, 'sg_window', default_sg_window, validScalarPosNum)
 addOptional(p, 'm_window', default_m_window, validScalarPosNum)
 addOptional(p, 'edge_method', default_edge_method, validEdgeMethod)
+addOptional(p, 'knee_method', default_knee_method, validKneeMethod);
 addOptional(p, 'keep_pks', default_keep_pks, validScalarPosNum)
 addOptional(p, 'knee_method', default_knee_method, validKneeMethod)
 addOptional(p, 'z_thr_elev', default_z_thr_elev, validMaxMinWidths)
@@ -117,7 +118,7 @@ peak_prom = p.Results.peak_prom;
 sg_window = p.Results.sg_window; 
 m_window = p.Results.m_window; 
 edge_method = convertCharsToStrings(p.Results.edge_method);
-keep_pks = p.Results.keep_pks;
+knee_method = convertCharsToStrings(p.Results.knee_method);
 knee_method = p.Results.knee_method;
 z_thr_elev = p.Results.z_thr_elev; 
 z_thr_idx = p.Results.z_thr_idx; 
@@ -173,6 +174,8 @@ lelev = NaN(no_profs, 1);        % channel elevation at left edge of profile [m]
 rx = NaN(no_profs, 1);           % right edge x coord [pix]
 ry = NaN(no_profs, 1);           % right edge y coord [pix]
 relev = NaN(no_profs, 1);        % channel elevation at right edge of profile [m]
+is_peak = false(no_profs, 2);
+
 % left/right is correct when looking from START to END
 
 % smoothing array
@@ -273,6 +276,7 @@ for i = 1:no_profs
             [~, idx] = knee_pt(rprof(out_th:end), 'knee_method', knee_method);      % find the knee point in the search area
             redge_idx(i) = idx+out_th;                  
             redge_sm(i) = true;                         % set as filterable
+            is_peak(i, 2) = true;
         else
             idx = ceil(pk(end)-1);                 % find the index of the peak
             redge_idx(i) = idx+out_th;                         
@@ -292,14 +296,14 @@ for i = 1:no_profs
             [~, idx] = knee_pt(lprof(out_th:end), 'knee_method', knee_method);      % find the knee point in the search area
             idx = prof_length - (idx+out_th);         % profile was flipped! correcting for that:
             ledge_sm(i) = true;                         % set as filterable
+            is_peak(i, 1) = true;
         else                                            
             idx = ceil(pk(end)-1);                 % find the index of the peak
-            idx = prof_length - (idx+out_th);                  % profile was flipped! correcting for that:
+            idx = prof_length+1 - (idx+out_th);                  % profile was flipped! correcting for that:
             ledge_sm(i) = false;                        % set to preserve during filtering
         end 
 
         ledge_idx(i) = idx;
-
     else
         error("Invalid edge method. Check find_edges() parameters, set edge_method to 'SlopeThreshold', 'KneePoint' or 'NearPeaks'.")
     end
@@ -310,19 +314,6 @@ end
 if m_window ~= 0
     ledge_idx_filt = ceil(medfilt1(ledge_idx, m_window, [], 1, 'truncate')); 
     redge_idx_filt = ceil(medfilt1(redge_idx, m_window, [], 1, 'truncate'));
-
-
-    if keep_pks == 1         % preserve the peaks position from smoothing by resetting them back
-        for i =1:no_profs
-            if ~ledge_sm(i)
-                ledge_idx_filt(i) = ledge_idx(i);
-            end
-    
-            if ~redge_sm(i)
-                redge_idx_filt(i) = redge_idx(i);
-            end
-        end
-    end
 else
     ledge_idx_filt = ledge_idx; 
     redge_idx_filt = redge_idx; 

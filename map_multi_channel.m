@@ -204,7 +204,8 @@ edge_coord = cell(no_channels, 1);
 edge_elev = cell(no_channels, 1); 
 fchannel = cell(no_channels, 1);
 trough_elev = cell(no_channels, 1); 
-trough_depth = cell(no_channels, 1); 
+trough_depth = cell(no_channels, 1);
+keep_prof = cell(no_channels, 1);
 
 % to store whether we "successfully" found the channel centerline: 
 channel_status = zeros(no_channels, 1); 
@@ -233,7 +234,7 @@ for c = 1:no_channels
     [profiles{c}, x_prof{c}, y_prof{c}] = find_profiles(x_cent{c}, y_cent{c}, DEM, R, ...
                                                 'prof_length',      prof_length, ...
                                                 'prof_interval',    prof_interval);
-    no_profiles = size(profiles, 2); 
+    no_profiles = size(profiles{c}, 2); 
 
     % find channel edges/outlines
     [edge_idx{c}, edge_coord{c}, edge_elev{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
@@ -245,7 +246,6 @@ for c = 1:no_channels
                                                 'm_window',         m_window, ...
                                                 'slope_thr',        slope_thr, ...
                                                 'peak_prom',        peak_prom, ...
-                                                'keep_pks',         keep_pks, ...
                                                 'z_thr_elev',       z_thr_elev, ...
                                                 'z_thr_idx',        z_thr_idx, ...
                                                 'edge_subst_window', edge_subst_window);
@@ -257,14 +257,23 @@ for c = 1:no_channels
 
     channel_width = (edge_idx{c}(:,1)-edge_idx{c}(:,2))*res; % [m]
 
+   
+    % validate all cross sections
+    [keep_prof{c}] = validate_profiles(profiles{c}, res, edge_elev{c}, ... 
+                                                'validation_methods', validation_methods);
+
     % visualize
     % profile transects
     if plot_prof_transects == 1
-        scatter(x_prof{c}(:), y_prof{c}(:), 1, 'w')
+        scatter(x_prof{c}(:, keep_prof{c}), y_prof{c}(:, keep_prof{c}), 1, 'w')
+        scatter(x_prof{c}(:, ~keep_prof{c}), y_prof{c}(:, ~keep_prof{c}), 2, 'b')
     end
+
     % centerlines
+    hold on
     scatter(x_cent{c}, y_cent{c}, 15, 'r', 'filled')
     plot(x_cent{c}, y_cent{c}, 'r')
+    
     % edges/outlines
     scatter(edge_coord{c}(:,1), edge_coord{c}(:,2), 15, 'g', 'filled')
     scatter(edge_coord{c}(:,3), edge_coord{c}(:,4), 15, 'g', 'filled')
@@ -277,10 +286,11 @@ for c = 1:no_channels
         plot(edge_coord{c}(:,1), edge_coord{c}(:,2), 'g')
         plot(edge_coord{c}(:,3), edge_coord{c}(:,4), 'g')
     end
+
     % annotation
     text(P_start(c,1) + text_offs, P_start(c,2) + text_offs, channel_label(c), 'Color', 'm')
-    pause(0.01) % (force matlab to plot)
-    
+    pause(0.01) % just to force matlab to plot
+    hold off
     % label for shapefile
     fchannel{c} = channel_label(c); 
     
@@ -345,6 +355,13 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
     
     for c = 1:no_channels
         
+        all_profiles = profiles{c};
+        profiles{c} = all_profiles(:, keep_prof{c});
+        all_edge_idx = edge_idx{c};
+        edge_idx{c} = all_edge_idx(keep_prof{c}, :);
+        all_edge_elev = edge_elev{c};
+        edge_elev{c} = all_edge_elev(keep_prof{c}, :);
+
         % cross sectional profiles
         no_profiles = size(profiles{c}, 2); 
         
@@ -372,8 +389,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         title(append(channel_label(c), ' cross sectional profiles (full, abs. heights)'))
         hcb = colorbar;
         title(hcb, 'norm. dist. along channel [-]')
-        plot(edge_pos_vector, edge_elev{c}, 'o', 'MarkerFaceColor', 'w', 'MarkerEdgeColor', 'g', 'MarkerSize', 7)
-
+        plot(edge_pos_vector, edge_elev{c}, 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
         if save_figs
             fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev');
             print(fn, figs_filetype, figs_resolution)
