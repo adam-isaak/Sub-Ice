@@ -105,7 +105,6 @@ addOptional(p, 'm_window', default_m_window, validScalarPosNum)
 addOptional(p, 'edge_method', default_edge_method, validEdgeMethod)
 addOptional(p, 'knee_method', default_knee_method, validKneeMethod);
 addOptional(p, 'keep_pks', default_keep_pks, validScalarPosNum)
-addOptional(p, 'knee_method', default_knee_method, validKneeMethod)
 addOptional(p, 'z_thr_elev', default_z_thr_elev, validMaxMinWidths)
 addOptional(p, 'z_thr_idx', default_z_thr_idx, validMaxMinWidths)
 addOptional(p, 'edge_subst_window', default_edge_subst_window, validScalarPosNum)

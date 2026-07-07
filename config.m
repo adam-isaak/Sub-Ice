@@ -88,22 +88,6 @@ trough_subst_window = 3;          % window for outlier substitution (moving mean
 plot_prof_transects = 1;          % plot profile transects on overview figure Y/N
 plot_edge_gaps = 1;               % plot across the gaps left after edge outlier filtering Y/N
 
-% outlier filtering of edges (based on z-score)
-z_thr_elev = [1.5 1.5];           % z-score outlier threshold, elevation of edge (set to 0 to skip outlier identification)
-                                  % optional: [left_thr right_thr] to use different thresholds for the left and right edge
-z_thr_idx = [1.5 1.5];            % z-score outlier threshold, profile index of edge (set to 0 to skip outlier identification)
-                                  % optional: [left_thr right_thr] to use different thresholds for the left and right edge
-edge_subst_window = 5;            % window size for outlier substitution (moving median filter, set to 0 to leave out outliers altogether, default: 5)
-% note: set m_window = 0 (no edge smoothing) when filtering outliers
-
-% outlier filtering of trough depth (based on z-score)
-z_thr_trough_elev = 1.5;          % z-score outlier threshold, elevation of trough (set to 0 to skip outlier identification)
-trough_subst_window = 3;          % window for outlier substitution (moving mean filter, set to 0 to leave out outliers altogether, default: 3)
-
-% some controls for the overview figure, related to edge outlier filtering
-plot_prof_transects = 1;          % plot profile transects on overview figure Y/N
-plot_edge_gaps = 1;               % plot across the gaps left after edge outlier filtering Y/N
-
 % profile validation parameters
 validation_methods = ["all"];          % validation methods for the cross section ("EdgeThreshold", "MaxPeakTrough", or "AlongOutliers", set empty for no validation, set "all" to run all of them)
 

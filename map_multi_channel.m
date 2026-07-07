@@ -264,13 +264,13 @@ for c = 1:no_channels
 
     % visualize
     % profile transects
+    hold on
     if plot_prof_transects == 1
         scatter(x_prof{c}(:, keep_prof{c}), y_prof{c}(:, keep_prof{c}), 1, 'w')
         scatter(x_prof{c}(:, ~keep_prof{c}), y_prof{c}(:, ~keep_prof{c}), 2, 'b')
     end
 
     % centerlines
-    hold on
     scatter(x_cent{c}, y_cent{c}, 15, 'r', 'filled')
     plot(x_cent{c}, y_cent{c}, 'r')
     
@@ -355,12 +355,17 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
     
     for c = 1:no_channels
         
+        % filter array based on validation
         all_profiles = profiles{c};
         profiles{c} = all_profiles(:, keep_prof{c});
         all_edge_idx = edge_idx{c};
         edge_idx{c} = all_edge_idx(keep_prof{c}, :);
         all_edge_elev = edge_elev{c};
         edge_elev{c} = all_edge_elev(keep_prof{c}, :);
+        all_trough_elev = trough_elev{c};
+        trough_elev{c} = all_trough_elev(keep_prof{c}, :);
+        all_trough_depth = trough_depth{c};
+        trough_depth{c} = all_trough_depth(keep_prof{c}, :);
 
         % cross sectional profiles
         no_profiles = size(profiles{c}, 2); 
@@ -434,10 +439,10 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         plot(norm_dist_vector*channel_length{c}/1000, mean(profiles{c}))
         
         channel_width = (edge_idx{c}(:,1)-edge_idx{c}(:,2))*res; % [m]
-
+        
         figure(11)
         hold on
-        plot(norm_dist_vector*channel_length{c}/1000, trough_depth{c})
+        plot(norm_dist_vector*channel_length{c}/1000, trough_depth{c}*1)
         
         figure(12)
         hold on
