@@ -118,7 +118,6 @@ sg_window = p.Results.sg_window;
 m_window = p.Results.m_window; 
 edge_method = convertCharsToStrings(p.Results.edge_method);
 knee_method = convertCharsToStrings(p.Results.knee_method);
-knee_method = p.Results.knee_method;
 z_thr_elev = p.Results.z_thr_elev; 
 z_thr_idx = p.Results.z_thr_idx; 
 edge_subst_window = p.Results.edge_subst_window; 
