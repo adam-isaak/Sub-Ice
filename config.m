@@ -18,14 +18,14 @@
 %  (update as required)
 
 % ice shelf DEM (should be GeoTIFF)
-path_to_DEM = './input/thwaites/SETSM_WV02_20110127_15m.tif'; % to a single .tif for map_multi_channel.m, a directory of .tifs for map_channel_timeseries.m
+path_to_DEM = './input/venable.tif'; % to a single .tif for map_multi_channel.m, a directory of .tifs for map_channel_timeseries.m
 DEM_nodata = -9999;         % DEM no data value
 window_DEM = 0;             % window size for DEM smoothing [m] (will be rounded up to [pix], set to 0 for no smoothing)
                             % only works with map_multi_channel.m variations (TO DO: implement in map_channel_timeseries.m)
 
 % output behaviour: 
 results_dir = './output/';
-proj_subdir = 'test/'; 
+proj_subdir = 'venable/'; 
 fig_subdir = 'fig/'; 
 shp_subdir = 'shp/'; 
 file_prefix = 'default_';   % (optional)
@@ -43,18 +43,18 @@ start_end_method = 2;
 % 1 = click on start/end points
 % 2 = read from shapefile
 % 3 = manually enter in script
-path_to_start_end_shp = './input/thwaites/points_20110127_15m.shp'; 
+path_to_start_end_shp = './input/venable_start_end_4.shp'; 
 % ^ only needed when start_end_method is set to "2" (read from shapefile)
 % important: only works if shapefile has same map projection as DEM! 
 shelf_filter = ''; % no filtering: shelf_filter = ''; 
 % ^ optional: filter shapefile on "Shelf" field
 
 % centerline search parameters
-search_step = 500;               % distance to step away from last known centerline point to construct search profile [m]
-search_angle = 130;                % angle of view within to look for next centerline point [deg]
+search_step = 1500;               % distance to step away from last known centerline point to construct search profile [m]
+search_angle = 85;                % angle of view within to look for next centerline point [deg]
 max_gradient = 2;                 % if new centerline point's elevation exceeds max. gradient, pick next best point instead [%]
-window_cent = 100;                 % window size for search profile smoothing [m] (will be rounded up to [pix], set to 0 for no smoothing)
-max_recursions = 1000;               % keep trying with slightly different search parameters in case channel end point is not found [-] (set to 0 or 1 for no recursion)
+window_cent = 20;                 % window size for search profile smoothing [m] (will be rounded up to [pix], set to 0 for no smoothing)
+max_recursions = 1;               % keep trying with slightly different search parameters in case channel end point is not found [-] (set to 0 or 1 for no recursion)
 % length of search segment = (search_angle/360)*2*pi*search_step
 
 % channel cross sectional profile parameters
@@ -70,7 +70,7 @@ sg_window = 1000;                 % window size for profile smoothing [m] (will 
 m_window = 0;                     % window size for edge smoothing [-] (no. of profile edges, set to 0 for no smoothing, median filter)
 
 slope_thr = 0.00;                 % slope threshold for identifying edge [deg] (only used when edge_method = "SlopeThreshold")
-peak_prom = 1;                    % MinPeakProm for findpeaks() [m], minimum prominence for channel edge (only used when edge_method = "NearPeaks")
+peak_prom = 0.5;                    % MinPeakProm for findpeaks() [m], minimum prominence for channel edge (only used when edge_method = "NearPeaks")
 
 % outlier filtering of edges (based on z-score)
 z_thr_elev = [1.5 1.5];           % z-score outlier threshold, elevation of edge (set to 0 to skip outlier identification)
