@@ -1,4 +1,3 @@
-
 %% Sub-Ice: DEM-based semi-automized mapping of ice shelf basal channels
 %  Configuration file to be read by main scripts, for configuring filepaths
 %  to input/output data, centerline search parameters and other user 
@@ -22,6 +21,7 @@ path_to_DEM = './input/venable.tif'; % to a single .tif for map_multi_channel.m,
 DEM_nodata = -9999;         % DEM no data value
 window_DEM = 0;             % window size for DEM smoothing [m] (will be rounded up to [pix], set to 0 for no smoothing)
                             % only works with map_multi_channel.m variations (TO DO: implement in map_channel_timeseries.m)
+clims = [-20 80];           % color limits for visualisation (update as required) [m]
 
 % output behaviour: 
 results_dir = './output/';
@@ -93,9 +93,6 @@ validation_methods = ["all"];          % validation methods for the cross sectio
 
 %% manage directories
 %  (no need to update)
-
-% add "functions" directory to search path
-addpath("./functions")
 
 % create output directories, if necessary
 if save_figs % figures

@@ -1,7 +1,3 @@
-clear all
-close all
-clc
-
 %% Sub-Ice: DEM-based semi-automized mapping of ice shelf basal channels
 %  Algorithm that returns ice shelf basal channels' centerline, outlines
 %  and cross sectional profiles; based on surface expressions in a DEM. 
@@ -26,14 +22,6 @@ clc
 %  project team members: Marcelo Santis & Dylan Kreynen
 %  advisor: Karen Alley (University of Manitoba)
 %  McCarthy (AK), June 2024
-
-
-%% run configuration file - set user specifiable parameters
-%  contains filepaths to input/output data, sets method to select channel
-%  start/end points, configures centerline search parameters, output 
-%  behaviour etc. > update configuration file as required! 
-
-run 'config.m'
 
 
 %% read DEM from GeoTIFF
@@ -82,10 +70,7 @@ end
 %  have user click on channel start and end points through GUI, read start
 %  and end points from shapefile or enter img coordinates manually
 
-% color limits for visualisation (update as required)
-clims = [-20 80];              % [m]
-
-figure(1)
+figure(config_num*100000)
 imagesc(DEM, clims)
 hold on
 axis image
@@ -183,7 +168,7 @@ end
 %% map channel geometries and extract profiles
 %  and visualize on overview figure
 
-f = figure(1); 
+figure(config_num*100000)
 hold off
 imagesc(DEM, clims)
 axis image
@@ -385,7 +370,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         cmap = parula(no_profiles);
 
         % full cross sectional profiles using absolute elevation
-        figure
+        figure(config_num*100000+c*100+1)
         hold on
         set(gca(), 'ColorOrder', cmap)
         plot(prof_dist_vector, profiles{c}, 'LineWidth', 3)
@@ -401,7 +386,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         end
 
         % between channel edges using relative elevation (depth w.r.t. left channel edge)
-        figure
+        figure(config_num*100000+c*100+2)
         hold on
         for i = 1:no_profiles
             if isnan(edge_idx{c}(i,1)) || isnan(edge_idx{c}(i,2))
@@ -434,22 +419,52 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         % plotting some metrics along channel length
         norm_dist_vector = (1:no_profiles)./no_profiles; 
         
-        figure(10)
+        figure(config_num*100000+c*100+3)
         hold on
         plot(norm_dist_vector*channel_length{c}/1000, mean(profiles{c}))
-        
+        ylabel('elevation [m]')
+        xlabel('distance along channel [km]')
+        title('mean profile elevation (full) vs. distance along channel')
+        legend(channel_label(c))
+
+        if save_figs
+            fn = append(fig_dir, file_prefix, 'elev_vs_distance_along_channel'); 
+            print(fn, figs_filetype, figs_resolution)
+        end
+
         channel_width = (edge_idx{c}(:,1)-edge_idx{c}(:,2))*res; % [m]
         
-        figure(11)
+
+        figure(config_num*100000+c*100+4)
         hold on
         plot(norm_dist_vector*channel_length{c}/1000, trough_depth{c}*1)
+        ylabel('depth w.r.t. left channel edge [m]')
+        xlabel('distance along channel [km]')
+        title('channel depth vs. distance along channel')
+        legend(channel_label(c))
+
+        if save_figs
+            fn = append(fig_dir, file_prefix, 'depth_vs_distance_along_channel'); 
+            print(fn, figs_filetype, figs_resolution)
+        end
+
         
-        figure(12)
+        figure(config_num*100000+c*100+5)
         hold on
         plot(norm_dist_vector*channel_length{c}/1000, channel_width/1000)
+        ylabel('channel width [km]')
+        xlabel('distance along channel [km]')
+        title('channel width vs. distance along channel')
+        legend(channel_label(c))
+
+        if save_figs
+            fn = append(fig_dir, file_prefix, 'width_vs_distance_along_channel'); 
+            print(fn, figs_filetype, figs_resolution)
+        end
+
 
         % edge and trough elevation and depth along channel (one figure per channel)
-        figure
+        figure(config_num*100000+c*100+6)
 
         subplot(2, 1, 1)
         hold on
@@ -474,42 +489,6 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
             print(fn, figs_filetype, figs_resolution)
         end
     end
-    
-    figure(10)
-    ylabel('elevation [m]')
-    xlabel('distance along channel [km]')
-    title('mean profile elevation (full) vs. distance along channel')
-    legend(channel_label)
-    
-    if save_figs
-        fn = append(fig_dir, file_prefix, 'elev_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
-    end
-    
-    
-    figure(11)
-    ylabel('depth w.r.t. left channel edge [m]')
-    xlabel('distance along channel [km]')
-    title('channel depth vs. distance along channel')
-    legend(channel_label)
-    
-    if save_figs
-        fn = append(fig_dir, file_prefix, 'depth_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
-    end
-    
-    
-    figure(12)
-    ylabel('channel width [km]')
-    xlabel('distance along channel [km]')
-    title('channel width vs. distance along channel')
-    legend(channel_label)
-    
-    if save_figs
-        fn = append(fig_dir, file_prefix, 'width_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
-    end
-    
 end
     
 disp("Done! ")
