@@ -10,13 +10,17 @@
 
 if(isfile(input_path))          % if a single file is specified find that specific file and run it as the configuration
     % set the default number of configs as 0
-    config_num = 0;   
+    config_num = 1;   
     
     % run the specified config file
     run(input_path)
 
     % Run the mapping behaviour 
-    run 'map_multi_channel.m'
+    if (map_timeseries)
+        run 'map_channel_timeseries.m'
+    else 
+        run 'map_multi_channel.m'
+    end
 elseif(isfolder(input_path))    % if the path is a folder find configs and iterate through them
     if(recursive)
         % finds all files in specifiefd folder and files in subfolders that end in `.m`
@@ -48,8 +52,12 @@ elseif(isfolder(input_path))    % if the path is a folder find configs and itera
                 save_shps = over_save_shps(2);
             end
 
-            % map the channges
-            run 'map_multi_channel.m'
+            % map the changes
+            if (map_timeseries)
+                run 'map_channel_timeseries.m'
+            else 
+                run 'map_multi_channel.m'
+            end
 
             % increment the channel ID
             config_num = config_num + 1;

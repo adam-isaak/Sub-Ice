@@ -18,7 +18,9 @@ close all
 clc
 
 %% Inputs
-input_path = "./input/testing";     % Input config file or folder specifiyin the location of the configuration files to run multiple
+input_path = "./config.m";     % Input config file or folder specifiyin the location of the configuration files to run multiple
+
+map_timeseries = 0;             % Control for whehter it should run a timeseries or not
 
 % folder controls
 config_match = "^config.*\.m$";     % Regex statement to match the config file
@@ -27,7 +29,7 @@ recursive = 1;                      % Whether or not if it is a folder we should
 
 %% Overides
 % overides default config variables when running through multiple configs
-over_ext_figs = [0, 0];     % overrides ext_figs, based on the first value, and assigns it the second value
+over_ext_figs = [1, 0];     % overrides ext_figs, based on the first value, and assigns it the second value
 over_save_figs = [0, 0];    % overrides save_figs, based on the first value, and assigns it the second value
 over_save_shps = [0, 0];    % overrides save_shps, based on the first value, and assigns it the second value
 
