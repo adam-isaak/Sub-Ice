@@ -15,6 +15,17 @@ if(isfile(input_path))          % if a single file is specified find that specif
     % run the specified config file
     run(input_path)
 
+    % run the overrides for the configuration files
+    if(over_ext_figs(1))
+        ext_figs = over_ext_figs(2);
+    end
+    if(over_save_figs(1))
+        save_figs = over_save_figs(2);
+    end
+    if(over_save_shps(1))
+        save_shps = over_save_shps(2);
+    end
+
     % Run the mapping behaviour 
     if (map_timeseries)
         run 'map_channel_timeseries.m'
