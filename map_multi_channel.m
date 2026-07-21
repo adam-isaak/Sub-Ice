@@ -333,13 +333,15 @@ if save_figs || save_shps || save_struct || save_table
         raw_struct = struct;
         raw_struct.created = datetime('now');
         raw_struct.updated = datetime('now');
+        raw_struct.crs = R.ProjectedCRS;
         raw_struct.DEM_path = path_to_DEM;
         raw_struct.resolution = res;
         raw_struct.validation_methods = validation_methods;
         raw_struct.edge_detection_emthod = edge_method;
         raw_struct.knee_method = knee_method;
         
-        % iterate trhough channels saving them out
+
+        % iterate through channels saving them out
         channels_struct = cell(no_channels, 1);
         for c = 1:no_channels
             channel = struct;
@@ -347,22 +349,37 @@ if save_figs || save_shps || save_struct || save_table
             channel.length = channel_length{c};
             channel.end_found = channel_status(c);
             channel.width = channel_width(c);
-            channel.cent_coordinate = [x_cent{c}, y_cent{c}];
+            channel.centerline_pixel_coordinate = [x_cent{c}, y_cent{c}];
 
+            [x_cent_crs, y_cent_crs] = intrinsicToWorld(R, x_cent{c}, y_cent{c});
+
+            channel.centreline_crs_coordinates = [x_cent_crs, y_cent_crs];
 
             % iterate through the channels profiles saving them out
             no_profiles = size(profiles{c}, 2);
             profiles_struct = cell(no_profiles, 1); 
             for p = 1:no_profiles
                 profile = struct;
-                profile.elevation = profiles{c}(:, p);
-                profile.x_coordinates = x_prof{c}(:, p);
-                profile.y_coordinates = y_prof{c}(:, p);
 
+                % profile data
+                profile.elevation = profiles{c}(:, p);
+                profile.x_pixel_coordinates = x_prof{c}(:, p);
+                profile.y_pixel_coordinates = y_prof{c}(:, p);
+
+                [x_prof_crs, y_prof_crs] = intrinsicToWorld(R, x_prof{c}(:, p), y_prof{c}(:, p));
+                profile.x_crs_coordinates = x_prof_crs;
+                profile.y_crs_coordinates = y_prof_crs;
+
+                % edge data
                 profile.left_edge_elevation = edge_elev{c}(p, 1);
                 profile.right_edge_elevation = edge_elev{c}(p, 2);
-                profile.left_edge_coordinates = edge_coord{c}(p, 1:2);
-                profile.right_edge_coordinates = edge_coord{c}(p, 3:4);
+                profile.left_edge_pixel_coordinates = edge_coord{c}(p, 1:2);
+                profile.right_edge_pixel_coordinates = edge_coord{c}(p, 3:4);
+
+                [left_edge_crs_x, left_edge_Crs_y] = intrinsicToWorld(R, edge_coord{c}(p, 1), edge_coord{c}(p, 2));
+                [right_edge_crs_x, right_edge_Crs_y] = intrinsicToWorld(R, edge_coord{c}(p, 3), edge_coord{c}(p, 4));
+                profile.left_edge_crs_coordinates = [left_edge_crs_x, left_edge_Crs_y];
+                profile.right_edge_crs_coordinates = [right_edge_crs_x, right_edge_Crs_y];
 
                 profile.trough = trough_elev{c}(p);
                 profile.trough_depth = trough_depth{c}(p);

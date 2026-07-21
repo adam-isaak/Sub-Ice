@@ -39,7 +39,7 @@ figs_resolution = '-r500';  % for use with "print()"
 ext_figs = 1;               % plot (and print) extended figures Y/N
 save_shps = 0;              % save output as shapefiles Y/N
 
-save_struct = 1;
+save_struct = 1;            % save struct data as out as a mat file Y/N
 
 % select method to specify channel start/end points
 start_end_method = 2;
@@ -112,7 +112,7 @@ if save_shps % shapefiles
     end
 end
 
-if save_struct
+if save_struct % data
     data_dir = append(results_dir, proj_subdir, data_subdir);
     if ~exist(data_dir, 'dir')
         mkdir(data_dir)
