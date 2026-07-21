@@ -286,8 +286,8 @@ disp(append("Finished mapping. End point reached for ", string(sum(channel_statu
 
 %% write to files
 
-if save_figs || save_shps
-    disp("Writing figure- and shapefiles... ")
+if save_figs || save_shps || save_struct || save_table
+    disp("Writing figure-, shapefiles-, and .mat... ")
 
     % print overview figure to file
     if save_figs
@@ -326,6 +326,57 @@ if save_figs || save_shps
             fn = append(shp_dir, file_prefix, channel_label(c), "_profiles"); 
             lines_to_shp(x_prof{c}, y_prof{c}, R, fn, 'prof_no', fprof);
         end 
+    end
+
+    if save_struct
+        % create structure
+        raw_struct = struct;
+        raw_struct.created = datetime('now');
+        raw_struct.updated = datetime('now');
+        raw_struct.DEM_path = path_to_DEM;
+        raw_struct.resolution = res;
+        raw_struct.validation_methods = validation_methods;
+        raw_struct.edge_detection_emthod = edge_method;
+        raw_struct.knee_method = knee_method;
+        
+        % iterate trhough channels saving them out
+        channels_struct = cell(no_channels, 1);
+        for c = 1:no_channels
+            channel = struct;
+
+            channel.length = channel_length{c};
+            channel.end_found = channel_status(c);
+            channel.width = channel_width(c);
+            channel.cent_coordinate = [x_cent{c}, y_cent{c}];
+
+
+            % iterate through the channels profiles saving them out
+            no_profiles = size(profiles{c}, 2);
+            profiles_struct = cell(no_profiles, 1); 
+            for p = 1:no_profiles
+                profile = struct;
+                profile.elevation = profiles{c}(:, p);
+                profile.x_coordinates = x_prof{c}(:, p);
+                profile.y_coordinates = y_prof{c}(:, p);
+
+                profile.left_edge_elevation = edge_elev{c}(p, 1);
+                profile.right_edge_elevation = edge_elev{c}(p, 2);
+                profile.left_edge_coordinates = edge_coord{c}(p, 1:2);
+                profile.right_edge_coordinates = edge_coord{c}(p, 3:4);
+
+                profile.trough = trough_elev{c}(p);
+                profile.trough_depth = trough_depth{c}(p);
+
+                profiles_struct{p} = profile;
+            end
+            channel.profiles = profiles_struct;
+
+            channels_struct{c} = channel;
+        end
+        raw_struct.channels = channels_struct;
+
+        fn = append(data_dir, file_prefix, 'struct_data', '.mat');
+        save(fn, 'raw_struct');
     end
 
     disp(append("Done writing files. Check '", append(results_dir, proj_subdir), "' for output. "))

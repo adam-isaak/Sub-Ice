@@ -17,8 +17,8 @@ For now, please refer to comments in the code for details!
 
 #### Getting started: 
 1. Clone this GitHub repository to create a local copy of the code on your computer (or download and unzip). 
-2. Update the user specifiable parameters in *config.m* as required. 
-3. Run *map_multi_channel.m* using a recent version of Matlab (code tested in R2026a). 
+2. Update the user specifiable parameters in *sub_ice.m*, and *config.m* as required. 
+3. Run *sub_ice.m* using a recent version of Matlab (code tested in R2026a). 
 
 That's it! All data required to map your first basal channels is already included. 
 
@@ -29,7 +29,9 @@ That's it! All data required to map your first basal channels is already include
   - *map_channel_timeseries.m*:
     map a single channel over different DEMs (note: this workflow needs updating, use map_multi_channel.m instead)
   - *config.m*:
-    configuration file with user specifiable variables
+    configuration file with user specifiable variables, template file to base other configs off of
+  - *sub_ice.m*:
+    control script with user specifiable variables showing script to run with which config
 
  #### Directories in this distribution: 
   - *./functions*:

@@ -28,6 +28,7 @@ results_dir = './output/';
 proj_subdir = 'venable/'; 
 fig_subdir = 'fig/'; 
 shp_subdir = 'shp/'; 
+data_subdir = 'data/';
 file_prefix = 'default_';   % (optional)
 % output path will be constructed as follows: 
 % results_dir/proj_subdir/fig_subdir/file_prefix_....ext
@@ -37,6 +38,8 @@ figs_filetype = '-dpng';    % for use with "print()"
 figs_resolution = '-r500';  % for use with "print()"
 ext_figs = 1;               % plot (and print) extended figures Y/N
 save_shps = 0;              % save output as shapefiles Y/N
+
+save_struct = 1;
 
 % select method to specify channel start/end points
 start_end_method = 2;
@@ -89,7 +92,7 @@ plot_prof_transects = 1;          % plot profile transects on overview figure Y/
 plot_edge_gaps = 1;               % plot across the gaps left after edge outlier filtering Y/N
 
 % profile validation parameters
-validation_methods = ["all"];          % validation methods for the cross section ("EdgeThreshold", "MaxPeakTrough", or "AlongOutliers", set empty for no validation, set "all" to run all of them)
+validation_methods = [];          % validation methods for the cross section ("EdgeThreshold", "MaxPeakTrough", or "AlongOutliers", set empty for no validation, set "all" to run all of them)
 
 %% manage directories
 %  (no need to update)
@@ -106,5 +109,12 @@ if save_shps % shapefiles
     shp_dir = append(results_dir, proj_subdir, shp_subdir); 
     if ~exist(shp_dir, 'dir')
         mkdir(shp_dir)
+    end
+end
+
+if save_struct
+    data_dir = append(results_dir, proj_subdir, data_subdir);
+    if ~exist(data_dir, 'dir')
+        mkdir(data_dir)
     end
 end
