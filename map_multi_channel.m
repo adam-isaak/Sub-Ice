@@ -366,6 +366,7 @@ if save_figs || save_shps || save_struct || save_table
                 profile.x_pixel_coordinates = x_prof{c}(:, p);
                 profile.y_pixel_coordinates = y_prof{c}(:, p);
 
+                % get coordinates into CRS format
                 [x_prof_crs, y_prof_crs] = intrinsicToWorld(R, x_prof{c}(:, p), y_prof{c}(:, p));
                 profile.x_crs_coordinates = x_prof_crs;
                 profile.y_crs_coordinates = y_prof_crs;
@@ -376,14 +377,17 @@ if save_figs || save_shps || save_struct || save_table
                 profile.left_edge_pixel_coordinates = edge_coord{c}(p, 1:2);
                 profile.right_edge_pixel_coordinates = edge_coord{c}(p, 3:4);
 
+                % get coordinates into CRS format
                 [left_edge_crs_x, left_edge_Crs_y] = intrinsicToWorld(R, edge_coord{c}(p, 1), edge_coord{c}(p, 2));
                 [right_edge_crs_x, right_edge_Crs_y] = intrinsicToWorld(R, edge_coord{c}(p, 3), edge_coord{c}(p, 4));
                 profile.left_edge_crs_coordinates = [left_edge_crs_x, left_edge_Crs_y];
                 profile.right_edge_crs_coordinates = [right_edge_crs_x, right_edge_Crs_y];
 
+                % trough data
                 profile.trough = trough_elev{c}(p);
                 profile.trough_depth = trough_depth{c}(p);
                 
+                % whether the profiles was valid, blank if no validation techniques used
                 if(isempty(validation_methods))
                     profile.validated = nan;
                 else
@@ -392,21 +396,31 @@ if save_figs || save_shps || save_struct || save_table
 
                 profiles_struct{p} = profile;
             end
+
+            % assign all the profile structures to the parent channel structure
             channel.profiles = profiles_struct;
 
             channels_struct{c} = channel;
         end
+
+        % assign all the channel structures to the parent data structure
         raw_struct.channels = channels_struct;
 
+        % save the structure out to a .mat file
         if save_struct
             fn = append(data_dir, file_prefix, 'struct_data', '.mat');
             save(fn, 'raw_struct');
         end
 
+        % save data out into tables in the specified format
         if save_table
+            % set a nunique config ID
             config_uid = sprintf("%d", config_num);
+
+            % create the name for the channel data file
             channel_file = append(data_dir,  file_prefix, config_uid, '_channels_', table_extension);
 
+            % create a table containting the important metadata
             metadata_table = table(config_uid, raw_struct.created, raw_struct.updated, ...
                                     raw_struct.crs.Name, ...
                                     string(raw_struct.DEM_path), ...
@@ -416,32 +430,40 @@ if save_figs || save_shps || save_struct || save_table
                                     raw_struct.knee_method, ... 
                                     VariableNames=["config_UID", "date_created", "date_updated", "CRS", "DEM_path", "DEM_resolution", "channel_path", "edge_detection_method", "knee_method"]);
             
+            % write the metadata to a specified file                     
             fn = append(data_dir,  file_prefix, config_uid, '_meta_', table_extension);
             writetable(metadata_table, fn);
 
+            % create the array to the hold the channel data before making a table
             channel_rows = ["channel_UID"; "elevation_profile_path"; "key_profile_points_path"; "length"; "width"; "reached_endpoint"];
             channel_headers = strings(no_channels, 1);
             channel_data = strings(6, no_channels);
 
+            % iterate through the channels
             for c=1:no_channels
+                % set a unique channel ID for each channel, based on the config ID
                 channel_uid = sprintf("%d_%d", config_num, c);
                 channel_headers(c) = append("channel_", channel_uid);
                 
+                % check to see if a profiles sub directory exists and if not create it
                 profile_dir = append(data_dir, 'profiles/');
                 if ~exist(profile_dir, 'dir')
                     mkdir(profile_dir)
                 end
 
+                % set the file names for current channels elevation data and important stats
                 elevation_file = append(profile_dir,  file_prefix, channel_uid, '_profile_elevation', table_extension);
-                key_points_file = append(profile_dir,  file_prefix, channel_uid, '_profile_stats', table_extension);
+                stats_file = append(profile_dir,  file_prefix, channel_uid, '_profile_stats', table_extension);
 
+                % set the data about this channel in the channel array
                 channel_data(1, c) = channel_uid;
                 channel_data(2, c) = elevation_file;
-                channel_data(3, c) = key_points_file;
+                channel_data(3, c) = stats_file;
                 channel_data(4, c) = raw_struct.channels{c}.length;
                 channel_data(5, c) = raw_struct.channels{c}.width;
                 channel_data(6, c) = raw_struct.channels{c}.end_found;
 
+                % create the profiles stats and elevation data arrays
                 no_profiles = size(profiles{c}, 2);
                 profiles_data_headers = strings(no_profiles*5, 1);
                 profiles_data = nan(size(raw_struct.channels{c}.profiles{1}.elevation, 1), no_profiles*5);
@@ -453,23 +475,31 @@ if save_figs || save_shps || save_struct || save_table
                                     "right_edge_X_coordinate (pix)", "right_edge_Y_coordinate_(m)", ...
                                     "right_edge_X_CRS_coordinate (pix)", "right_edge_Y_CRS_coordinate_(m)", ...
                                     "validated"]';
-                     
                 profiles_stats = strings(13, no_profiles);
+
+                % iterate through the channels profiles
                 for p=1:no_profiles
+                    % set the profile a unique ID based on both the config and the channel number
                     profile_uid = sprintf("%d_%d_%d", config_num, c, p);
+
+                    % set the elevation data headers names based on the ID
                     profiles_data_headers(p*5-4) = append(profile_uid, "_elevation_(m)");
                     profiles_data_headers(p*5-3) = append(profile_uid, " _X_(pix)");
                     profiles_data_headers(p*5-2) = append(profile_uid, "_Y_(pix)");
                     profiles_data_headers(p*5-1) = append(profile_uid, "_X_CRS_(m)");
                     profiles_data_headers(p*5-0) = append(profile_uid, "_Y_CRS_(m)");
 
+                    % save out the elvation data, elevation and coordinates
                     profiles_data(:, p*5-4) = raw_struct.channels{c}.profiles{p}.elevation;
                     profiles_data(:, p*5-3) = raw_struct.channels{c}.profiles{p}.x_pixel_coordinates;
                     profiles_data(:, p*5-2) = raw_struct.channels{c}.profiles{p}.y_pixel_coordinates;
                     profiles_data(:, p*5-1) = raw_struct.channels{c}.profiles{p}.x_crs_coordinates;
                     profiles_data(:, p*5-0) = raw_struct.channels{c}.profiles{p}.y_crs_coordinates;
 
+                    % save out the stats header based on the ID
                     profiles_stats_headers(p) = append("profile_", profile_uid);
+
+                    % save out the stats data for all the derived data, trough, edges, and the channels validation status
                     profiles_stats(1, p) = profile_uid;
                     profiles_stats(2, p) = raw_struct.channels{c}.profiles{p}.trough;
                     profiles_stats(3, p) = raw_struct.channels{c}.profiles{p}.trough_depth;
@@ -486,16 +516,20 @@ if save_figs || save_shps || save_struct || save_table
                     profiles_stats(14, p) =  raw_struct.channels{c}.profiles{p}.validated;
 
                 end
+
+                % take the elevation and stats arrays and make them into tables, with descriptive headers and rows
                 profiles_table = array2table(profiles_data, VariableNames=profiles_data_headers);
                 profiles_stats = array2table(profiles_stats, RowNames=profiles_stats_row, VariableNames=profiles_stats_headers);
                 
-
+                % write the tables to the specified files
                 writetable(profiles_table, elevation_file)
-                writetable(profiles_stats, key_points_file, "WriteRowNames", true);
+                writetable(profiles_stats, stats_file, "WriteRowNames", true);
             end
 
+            % take the channel data and make them into a table with decriptive headers and rows
             channel_table = array2table(channel_data, "VariableNames", channel_headers, "RowNames", channel_rows);
 
+            % write the table to the specified file
             writetable(channel_table, channel_file, "WriteRowNames", true);
         end
     end
