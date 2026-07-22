@@ -39,7 +39,10 @@ figs_resolution = '-r500';  % for use with "print()"
 ext_figs = 1;               % plot (and print) extended figures Y/N
 save_shps = 0;              % save output as shapefiles Y/N
 
-save_struct = 1;            % save struct data as out as a mat file Y/N
+save_struct = 1;            % save data output as struct in a mat file Y/N
+save_table = 1;             % save data output as table into a file Y/N 
+                            % any of the following formats.csv, .txt, .dat, xls, .xlsm, .xlsx, .xlsb, .json, and .xml 
+table_extension = '.csv';   % which extensino to use if save_table enabled
 
 % select method to specify channel start/end points
 start_end_method = 2;
@@ -112,7 +115,7 @@ if save_shps % shapefiles
     end
 end
 
-if save_struct % data
+if save_struct || save_table % data
     data_dir = append(results_dir, proj_subdir, data_subdir);
     if ~exist(data_dir, 'dir')
         mkdir(data_dir)

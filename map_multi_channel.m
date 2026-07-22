@@ -328,7 +328,7 @@ if save_figs || save_shps || save_struct || save_table
         end 
     end
 
-    if save_struct
+    if save_struct || save_table
         % create structure
         raw_struct = struct;
         raw_struct.created = datetime('now');
@@ -337,7 +337,7 @@ if save_figs || save_shps || save_struct || save_table
         raw_struct.DEM_path = path_to_DEM;
         raw_struct.resolution = res;
         raw_struct.validation_methods = validation_methods;
-        raw_struct.edge_detection_emthod = edge_method;
+        raw_struct.edge_detection_method = edge_method;
         raw_struct.knee_method = knee_method;
         
 
@@ -383,6 +383,12 @@ if save_figs || save_shps || save_struct || save_table
 
                 profile.trough = trough_elev{c}(p);
                 profile.trough_depth = trough_depth{c}(p);
+                
+                if(isempty(validation_methods))
+                    profile.validated = nan;
+                else
+                    profile.validated = keep_prof{c}(p);
+                end
 
                 profiles_struct{p} = profile;
             end
@@ -392,8 +398,106 @@ if save_figs || save_shps || save_struct || save_table
         end
         raw_struct.channels = channels_struct;
 
-        fn = append(data_dir, file_prefix, 'struct_data', '.mat');
-        save(fn, 'raw_struct');
+        if save_struct
+            fn = append(data_dir, file_prefix, 'struct_data', '.mat');
+            save(fn, 'raw_struct');
+        end
+
+        if save_table
+            config_uid = sprintf("%d", config_num);
+            channel_file = append(data_dir,  file_prefix, config_uid, '_channels_', table_extension);
+
+            metadata_table = table(config_uid, raw_struct.created, raw_struct.updated, ...
+                                    raw_struct.crs.Name, ...
+                                    string(raw_struct.DEM_path), ...
+                                    raw_struct.resolution, ...
+                                    channel_file, ...
+                                    raw_struct.edge_detection_method, ...
+                                    raw_struct.knee_method, ... 
+                                    VariableNames=["config_UID", "date_created", "date_updated", "CRS", "DEM_path", "DEM_resolution", "channel_path", "edge_detection_method", "knee_method"]);
+            
+            fn = append(data_dir,  file_prefix, config_uid, '_meta_', table_extension);
+            writetable(metadata_table, fn);
+
+            channel_rows = ["channel_UID"; "elevation_profile_path"; "key_profile_points_path"; "length"; "width"; "reached_endpoint"];
+            channel_headers = strings(no_channels, 1);
+            channel_data = strings(6, no_channels);
+
+            for c=1:no_channels
+                channel_uid = sprintf("%d_%d", config_num, c);
+                channel_headers(c) = append("channel_", channel_uid);
+                
+                profile_dir = append(data_dir, 'profiles/');
+                if ~exist(profile_dir, 'dir')
+                    mkdir(profile_dir)
+                end
+
+                elevation_file = append(profile_dir,  file_prefix, channel_uid, '_profile_elevation', table_extension);
+                key_points_file = append(profile_dir,  file_prefix, channel_uid, '_profile_stats', table_extension);
+
+                channel_data(1, c) = channel_uid;
+                channel_data(2, c) = elevation_file;
+                channel_data(3, c) = key_points_file;
+                channel_data(4, c) = raw_struct.channels{c}.length;
+                channel_data(5, c) = raw_struct.channels{c}.width;
+                channel_data(6, c) = raw_struct.channels{c}.end_found;
+
+                no_profiles = size(profiles{c}, 2);
+                profiles_data_headers = strings(no_profiles*5, 1);
+                profiles_data = nan(size(raw_struct.channels{c}.profiles{1}.elevation, 1), no_profiles*5);
+                profiles_stats_headers = strings(no_profiles, 1);
+                profiles_stats_row = ["profile_UID", "trough_elevation", "trough_depth", "left_edge_elevation", ...
+                                    "left_edge_X_coordinate (pix)", "left_edge_Y_coordinate_(m)", ...
+                                    "left_edge_X_CRS_coordinate (pix)", "left_edge_Y_CRS_coordinate_(m)", ...
+                                    "right_edge_elevation", ... 
+                                    "right_edge_X_coordinate (pix)", "right_edge_Y_coordinate_(m)", ...
+                                    "right_edge_X_CRS_coordinate (pix)", "right_edge_Y_CRS_coordinate_(m)", ...
+                                    "validated"]';
+                     
+                profiles_stats = strings(13, no_profiles);
+                for p=1:no_profiles
+                    profile_uid = sprintf("%d_%d_%d", config_num, c, p);
+                    profiles_data_headers(p*5-4) = append(profile_uid, "_elevation_(m)");
+                    profiles_data_headers(p*5-3) = append(profile_uid, " _X_(pix)");
+                    profiles_data_headers(p*5-2) = append(profile_uid, "_Y_(pix)");
+                    profiles_data_headers(p*5-1) = append(profile_uid, "_X_CRS_(m)");
+                    profiles_data_headers(p*5-0) = append(profile_uid, "_Y_CRS_(m)");
+
+                    profiles_data(:, p*5-4) = raw_struct.channels{c}.profiles{p}.elevation;
+                    profiles_data(:, p*5-3) = raw_struct.channels{c}.profiles{p}.x_pixel_coordinates;
+                    profiles_data(:, p*5-2) = raw_struct.channels{c}.profiles{p}.y_pixel_coordinates;
+                    profiles_data(:, p*5-1) = raw_struct.channels{c}.profiles{p}.x_crs_coordinates;
+                    profiles_data(:, p*5-0) = raw_struct.channels{c}.profiles{p}.y_crs_coordinates;
+
+                    profiles_stats_headers(p) = append("profile_", profile_uid);
+                    profiles_stats(1, p) = profile_uid;
+                    profiles_stats(2, p) = raw_struct.channels{c}.profiles{p}.trough;
+                    profiles_stats(3, p) = raw_struct.channels{c}.profiles{p}.trough_depth;
+                    profiles_stats(4, p) = raw_struct.channels{c}.profiles{p}.left_edge_elevation;
+                    profiles_stats(5, p) = raw_struct.channels{c}.profiles{p}.left_edge_pixel_coordinates(1);
+                    profiles_stats(6, p) = raw_struct.channels{c}.profiles{p}.left_edge_pixel_coordinates(2);
+                    profiles_stats(7, p) = raw_struct.channels{c}.profiles{p}.left_edge_crs_coordinates(1);
+                    profiles_stats(8, p) = raw_struct.channels{c}.profiles{p}.left_edge_crs_coordinates(2);
+                    profiles_stats(9, p) = raw_struct.channels{c}.profiles{p}.right_edge_elevation;
+                    profiles_stats(10, p) = raw_struct.channels{c}.profiles{p}.right_edge_pixel_coordinates(1);
+                    profiles_stats(11, p) = raw_struct.channels{c}.profiles{p}.right_edge_pixel_coordinates(2);
+                    profiles_stats(12, p) = raw_struct.channels{c}.profiles{p}.right_edge_crs_coordinates(1);
+                    profiles_stats(13, p) = raw_struct.channels{c}.profiles{p}.right_edge_crs_coordinates(2);
+                    profiles_stats(14, p) =  raw_struct.channels{c}.profiles{p}.validated;
+
+                end
+                profiles_table = array2table(profiles_data, VariableNames=profiles_data_headers);
+                profiles_stats = array2table(profiles_stats, RowNames=profiles_stats_row, VariableNames=profiles_stats_headers);
+                
+
+                writetable(profiles_table, elevation_file)
+                writetable(profiles_stats, key_points_file, "WriteRowNames", true);
+            end
+
+            channel_table = array2table(channel_data, "VariableNames", channel_headers, "RowNames", channel_rows);
+
+            writetable(channel_table, channel_file, "WriteRowNames", true);
+        end
     end
 
     disp(append("Done writing files. Check '", append(results_dir, proj_subdir), "' for output. "))
