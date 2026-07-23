@@ -33,13 +33,13 @@ file_prefix = 'default_';   % (optional)
 % output path will be constructed as follows: 
 % results_dir/proj_subdir/fig_subdir/file_prefix_....ext
 
-save_figs = 1;              % print figures to disk Y/N
+save_figs = 0;              % print figures to disk Y/N
 figs_filetype = '-dpng';    % for use with "print()"
 figs_resolution = '-r500';  % for use with "print()"
-ext_figs = 1;               % plot (and print) extended figures Y/N
-save_shps = 1;              % save output as shapefiles Y/N
-save_struct = 1;            % save data output as struct in a mat file Y/N
-save_table = 1;             % save data output as table into a file Y/N 
+ext_figs = 0;               % plot (and print) extended figures Y/N
+save_shps = 0;              % save output as shapefiles Y/N
+save_struct = 0;            % save data output as struct in a mat file Y/N
+save_table = 0;             % save data output as table into a file Y/N 
                             % any of the following formats.csv, .txt, .dat, xls, .xlsm, .xlsx, .xlsb, .json, and .xml 
 table_extension = '.csv';   % which extensino to use if save_table enabled
 
