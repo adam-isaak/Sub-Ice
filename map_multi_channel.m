@@ -412,7 +412,8 @@ if save_figs || save_shps || save_struct || save_table
 
         % save the structure out to a .mat file
         if save_struct
-            fn = append(data_dir, file_prefix, 'struct_data', '.mat');
+            config_uid = sprintf("%d", config_num);
+            fn = append(data_dir, file_prefix, config_uid, '_struct_data', '.mat');
             save(fn, 'raw_struct');
         end
 
@@ -564,6 +565,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
 
         % cross sectional profiles
         no_profiles = size(profiles{c}, 2); 
+        channel_uid = sprintf("%d_%d", config_num, c);
         
         % for plotting profiles with [m] on x-axis
         prof_dist_vector = (1:size(profiles{c}, 1))*res; 
@@ -591,7 +593,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         title(hcb, 'norm. dist. along channel [-]')
         plot(edge_pos_vector, edge_elev{c}, 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
         if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev');
+            fn = append(fig_dir, file_prefix, channel_uid, '_channel_full_profiles_elev');
             print(fn, figs_filetype, figs_resolution)
         end
 
@@ -621,7 +623,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         title(hcb, 'norm. dist. along profile [-]')
 
         if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_lim_profiles_depth'); 
+            fn = append(fig_dir, file_prefix, channel_uid, '_channel_lim_profiles_depth'); 
             print(fn, figs_filetype, figs_resolution)
         end
         
@@ -638,7 +640,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         legend(channel_label(c))
 
         if save_figs
-            fn = append(fig_dir, file_prefix, 'elev_vs_distance_along_channel'); 
+            fn = append(fig_dir, file_prefix, channel_uid, '_channel_elev_vs_distance_along_channel'); 
             print(fn, figs_filetype, figs_resolution)
         end
 
@@ -654,7 +656,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         legend(channel_label(c))
 
         if save_figs
-            fn = append(fig_dir, file_prefix, 'depth_vs_distance_along_channel'); 
+            fn = append(fig_dir, file_prefix, channel_uid, '_channel_depth_vs_distance_along_channel'); 
             print(fn, figs_filetype, figs_resolution)
         end
 
@@ -668,7 +670,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         legend(channel_label(c))
 
         if save_figs
-            fn = append(fig_dir, file_prefix, 'width_vs_distance_along_channel'); 
+            fn = append(fig_dir, file_prefix, channel_uid, '_channelwidth_vs_distance_along_channel'); 
             print(fn, figs_filetype, figs_resolution)
         end
 
@@ -695,7 +697,7 @@ disp("Creating and possibly saving extended figures. Sit tight. ")
         legend('left edge', 'right edge', 'trough')
 
         if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_edge_trough_along_channel');
+            fn = append(fig_dir, file_prefix, channel_uid, '_channel_edge_trough_along_channel');
             print(fn, figs_filetype, figs_resolution)
         end
     end
