@@ -25,6 +25,35 @@ if(isfile(input_path))          % if a single file is specified find that specif
     if(over_save_shps(1))
         save_shps = over_save_shps(2);
     end
+    if(over_save_struct(1))
+        save_struct = over_save_struct(2);
+    end 
+    if(over_save_table(1))
+        save_table = over_save_table(2);
+    end
+
+    % create output directories, if necessary
+    if save_figs % figures
+        fig_dir = append(results_dir, proj_subdir, fig_subdir); 
+        if ~exist(fig_dir, 'dir')
+            mkdir(fig_dir)
+        end
+    end
+
+    if save_shps % shapefiles
+        shp_dir = append(results_dir, proj_subdir, shp_subdir); 
+        if ~exist(shp_dir, 'dir')
+            mkdir(shp_dir)
+        end
+    end
+
+    if save_struct || save_table % data
+        data_dir = append(results_dir, proj_subdir, data_subdir);
+        if ~exist(data_dir, 'dir')
+            mkdir(data_dir)
+        end
+    end
+
 
     % Run the mapping behaviour 
     if (map_timeseries)
@@ -45,6 +74,8 @@ elseif(isfolder(input_path))    % if the path is a folder find configs and itera
     no_files = size(input_folder, 1);
     config_num = 1;
     for i = 1:no_files
+        fprintf("Found and running through config-%d.\n", config_num)
+        
         % create the file path for the correct file
         file_path = string(append(input_folder(i).folder, '/', input_folder(i).name));
         
@@ -61,6 +92,34 @@ elseif(isfolder(input_path))    % if the path is a folder find configs and itera
             end
             if(over_save_shps(1))
                 save_shps = over_save_shps(2);
+            end
+            if(over_save_struct(1))
+                save_struct = over_save_struct(2);
+            end 
+            if(over_save_table(1))
+                save_table = over_save_table(2);
+            end
+
+            % create output directories, if necessary
+            if save_figs % figures
+                fig_dir = append(results_dir, proj_subdir, fig_subdir); 
+                if ~exist(fig_dir, 'dir')
+                    mkdir(fig_dir)
+                end
+            end
+
+            if save_shps % shapefiles
+                shp_dir = append(results_dir, proj_subdir, shp_subdir); 
+                if ~exist(shp_dir, 'dir')
+                    mkdir(shp_dir)
+                end
+            end
+
+            if save_struct || save_table % data
+                data_dir = append(results_dir, proj_subdir, data_subdir);
+                if ~exist(data_dir, 'dir')
+                    mkdir(data_dir)
+                end
             end
 
             % map the changes

@@ -287,12 +287,13 @@ disp(append("Finished mapping. End point reached for ", string(sum(channel_statu
 %% write to files
 
 if save_figs || save_shps || save_struct || save_table
-    disp("Writing figure-, shapefiles-, and .mat... ")
+    disp("Writing figure-, shapefiles-, tables, and .mat... ")
 
     % print overview figure to file
     if save_figs
         %f.WindowState = 'maximized'; % make figure fullscreen before saving
-        fn = append(fig_dir, file_prefix, 'mapped_channels'); 
+        config_uid = sprintf("_%d_", config_num);
+        fn = append(fig_dir, file_prefix, config_uid, 'mapped_channels');
         print(fn, figs_filetype, figs_resolution)
         %f.WindowState = 'normal'; 
     end
@@ -301,7 +302,8 @@ if save_figs || save_shps || save_struct || save_table
     if save_shps
     
         % all centerlines in a single file
-        fn = append(shp_dir, file_prefix, 'all_centerlines'); 
+        config_uid = sprintf("%d", config_num);
+        fn = append(shp_dir, file_prefix, config_uid, '_all_centerlines'); 
         lines_to_shp(x_cent, y_cent, R, fn, 'channel_label', fchannel); 
         
         % centerlines and outlines in one file per channel
@@ -315,7 +317,8 @@ if save_figs || save_shps || save_struct || save_table
             outlines_x{3} = edge_coord{c}(:,3);   % right edge
             outlines_y{3} = edge_coord{c}(:,4); 
             fline = {"centerline", "left_edge", "right_edge"}; 
-            fn = append(shp_dir, file_prefix, channel_label(c), "_outlines"); 
+            channel_uid = sprintf("%d_%d", config_num, c);
+            fn = append(shp_dir, file_prefix,  channel_uid, "_channel_outlines"); 
             lines_to_shp(outlines_x, outlines_y, R, fn, 'line_type', fline);
         end
         
@@ -323,7 +326,8 @@ if save_figs || save_shps || save_struct || save_table
         for c = 1:no_channels
             no_profiles = size(x_prof{c}, 2); 
             fprof = 1:no_profiles;  
-            fn = append(shp_dir, file_prefix, channel_label(c), "_profiles"); 
+            channel_uid = sprintf("%d_%d", config_num, c);
+            fn = append(shp_dir, file_prefix, channel_uid, "_channel_profiles"); 
             lines_to_shp(x_prof{c}, y_prof{c}, R, fn, 'prof_no', fprof);
         end 
     end
