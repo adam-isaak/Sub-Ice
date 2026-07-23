@@ -73,13 +73,12 @@ elseif(isfolder(input_path))    % if the path is a folder find configs and itera
     % loop through all files 
     no_files = size(input_folder, 1);
     config_num = 1;
-    for i = 1:no_files
-        fprintf("Found and running through config-%d.\n", config_num)
-        
+    for i = 1:no_files        
         % create the file path for the correct file
         file_path = string(append(input_folder(i).folder, '/', input_folder(i).name));
-        
         if(~isempty(regexp(input_folder(i).name, config_match, 'match')))
+            fprintf("Found and running through config-%d.\n", config_num)
+
             % run configuration file
             run(file_path)
 
