@@ -1,6 +1,7 @@
-function [edge_idx, edge_coord, edge_elev, valid_edges, alongprof] = find_edges(profiles, x_prof, y_prof, res, varargin)
-%[edge_idx, edge_coord, edge_elev] = find_edges(profiles, x_prof, y_prof,
-%res, edge_method, slope_thr, slope_thr, min_width, max_width, peak_prom, sg_window, m_window)
+function [edge_idx, edge_coord, edge_elev, valid_edges] = find_edges(profiles, x_prof, y_prof, res, varargin)
+%[edge_idx, edge_coord, edge_elev, valid_edges] = find_edges(profiles, x_prof, y_prof, res, ...
+%    'edge_method', edge_method, 'knee_method', knee_method, 'min_width', min_width, ...)
+%(optional input as name-value pairs, see below)
 %
 % Returns indices of channel cross sectional profiles that correspond with
 % the channel's outer edges, based on either a slope threshold or knee point
@@ -52,8 +53,8 @@ function [edge_idx, edge_coord, edge_elev, valid_edges, alongprof] = find_edges(
 %               optional: [left_thr right_thr] to use different thresholds for the left and right edge
 % z_thr_idx =   z-score outlier threshold, profile index of edge (set to 0 to skip outlier identification, default: 0)
 %               optional: [left_thr right_thr] to use different thresholds for the left and right edge
-% edge_subst_window = window size for outlier substitution (moving median filter, set to 0 to leave out outliers altogether, default: 5)  
-% knee_method = method used in the knee point detection ("LinearRegression" or the default "Kneedle")
+% edge_subst_window = window size for outlier substitution (moving median filter, set to 0 to leave out outliers altogether, default: 5)
+% verbose = print messages, e.g. on an adjusted smoothing window (default: true)  
 %
 % output: 
 % edge_idx = matrix containing profile indices corr. to channel edges [-]
@@ -120,6 +121,7 @@ addOptional(p, 'keep_pks', default_keep_pks, validScalarPosNum)
 addOptional(p, 'z_thr_elev', default_z_thr_elev, validMaxMinWidths)
 addOptional(p, 'z_thr_idx', default_z_thr_idx, validMaxMinWidths)
 addOptional(p, 'edge_subst_window', default_edge_subst_window, validScalarPosNum)
+addOptional(p, 'verbose', true, @(x) islogical(x) || isnumeric(x))
 parse(p, profiles, x_prof, y_prof, res, varargin{:}); 
 
 slope_thr = p.Results.slope_thr; 
@@ -133,6 +135,7 @@ knee_method = convertCharsToStrings(p.Results.knee_method);
 z_thr_elev = p.Results.z_thr_elev; 
 z_thr_idx = p.Results.z_thr_idx; 
 edge_subst_window = p.Results.edge_subst_window; 
+verbose = p.Results.verbose; 
 
 
 %% actual function
@@ -170,10 +173,17 @@ for s = 1:2
 end
 
 slope_thr = deg2rad(slope_thr);         % from [deg] to [rad]
-sg_window = ceil(sg_window/samp_step);  % from [m] yo [-] (index)
+sg_window = ceil(sg_window/samp_step);  % from [m] to [-] (index)
 if sg_window ~= 0 && mod(sg_window,2) == 0
     % make window odd
     sg_window = sg_window + 1; 
+end
+if sg_window ~= 0 && sg_window < 5
+    % Savitzky-Golay filter (degree 3) requires a window of at least 5 samples
+    if verbose
+        disp(append("Note: profile smoothing window (sg_window) increased to the minimum of 5 samples (", string(5*samp_step), " m). "))
+    end
+    sg_window = 5; 
 end
 
 ledge_idx = NaN(no_profs, 1);    % left edge index ("upper" edge in previous versions)
@@ -193,26 +203,16 @@ is_peak = false(no_profs, 2);
 ledge_sm = true(no_profs, 1);
 redge_sm = true(no_profs, 1);
 
-% along profiles
-% TO DO: now hard coded, better would be based on channel width (?)
-alongprofidx = [250 500 750 1000 1250 1500]; % [m]
-alongprofidx = floor(alongprofidx./samp_step); 
-alongprof = NaN(no_profs, 2*length(alongprofidx)+1); 
-
 for i = 1:no_profs
 
     prof = profiles(:,i); 
-
-    % along profiles (no smoothing)
-    ralongprof = prof([no_pts no_pts+alongprofidx]);    % incl. "centerline"
-    lalongprof = prof(fliplr(alongprofidx));            % excl. "centerline"
-    alongprof(i,:) = [lalongprof' ralongprof']; 
 
     % smooth profile using Savitzky-Golay filter 
     if sg_window ~= 0
         prof = sgolayfilt(prof, 3, sg_window); 
     end
-    % note: should we only smooth for slope threshold method, or also kneepoint/nearpeaks?
+    % (smoothed profile used to detect edges with all methods; edge
+    % elevations are taken from the original profile)
 
     if edge_method == "SlopeThreshold"
         slope = gradient(prof, samp_step);  % slope in [rad] (small angle), w.r.t. increasing profile index
@@ -230,6 +230,13 @@ for i = 1:no_profs
         hprof = prof(hidx);
         k_min = min_off(s);
         is_peak = false;
+
+        % no elevation data between min. and max. width (e.g. beyond the DEM
+        % or the ice front): no edge on this side, rather than a fallback edge
+        % at min./max. width
+        if all(isnan(hprof(k_min+1:end)))
+            continue
+        end
 
         if edge_method == "SlopeThreshold"
             % slope in outward direction
@@ -275,8 +282,24 @@ end
 
 % smooth edges using median filter (if window ~= 0) 
 if m_window ~= 0
-    ledge_idx_filt = ceil(medfilt1(ledge_idx, m_window, [], 1, 'truncate')); 
-    redge_idx_filt = ceil(medfilt1(redge_idx, m_window, [], 1, 'truncate'));
+    % (profiles without an edge stay without one)
+    ledge_idx_filt = ceil(medfilt1(ledge_idx, m_window, [], 1, 'omitnan', 'truncate'));
+    redge_idx_filt = ceil(medfilt1(redge_idx, m_window, [], 1, 'omitnan', 'truncate'));
+    ledge_idx_filt(isnan(ledge_idx)) = NaN;
+    redge_idx_filt(isnan(redge_idx)) = NaN;
+
+
+    if keep_pks == 1         % preserve the peaks position from smoothing by resetting them back
+        for i =1:no_profs
+            if ~ledge_sm(i)
+                ledge_idx_filt(i) = ledge_idx(i);
+            end
+    
+            if ~redge_sm(i)
+                redge_idx_filt(i) = redge_idx(i);
+            end
+        end
+    end
 else
     ledge_idx_filt = ledge_idx; 
     redge_idx_filt = redge_idx; 
@@ -319,25 +342,25 @@ end
 
 % fetch edge elevations
 for i = 1:no_profs
-    prof = profiles(:,i); 
-    lelev(i) = prof(ledge_idx_filt(i));
-    relev(i) = prof(redge_idx_filt(i)); 
+    prof = profiles(:,i);
+    if ~isnan(ledge_idx_filt(i)), lelev(i) = prof(ledge_idx_filt(i)); end
+    if ~isnan(redge_idx_filt(i)), relev(i) = prof(redge_idx_filt(i)); end
 end
 
 % z-score for edge profile index
-mean_idx = mean(ledge_idx_filt); 
-std_idx = std(ledge_idx_filt); 
+mean_idx = mean(ledge_idx_filt, 'omitnan');
+std_idx = std(ledge_idx_filt, 'omitnan');
 z_lidx = (ledge_idx_filt-mean_idx)./std_idx; % left edge
-mean_idx = mean(redge_idx_filt); 
-std_idx = std(redge_idx_filt); 
+mean_idx = mean(redge_idx_filt, 'omitnan');
+std_idx = std(redge_idx_filt, 'omitnan');
 z_ridx = (redge_idx_filt-mean_idx)./std_idx; % right edge
 
 % z-score for edge elevation
-mean_elev = mean(lelev); 
-std_elev = std(lelev); 
+mean_elev = mean(lelev, 'omitnan');
+std_elev = std(lelev, 'omitnan');
 z_lelev = (lelev-mean_elev)./std_elev; % left edge
-mean_elev = mean(relev); 
-std_elev = std(relev); 
+mean_elev = mean(relev, 'omitnan');
+std_elev = std(relev, 'omitnan');
 z_relev = (relev-mean_elev)./std_elev; % right edge
 
 % flag outliers (1 = keep, 0 = outlier)

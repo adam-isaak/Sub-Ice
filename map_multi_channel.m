@@ -2,21 +2,33 @@ clear all
 close all
 clc
 
-%% Sub-Ice: DEM-based semi-automized mapping of ice shelf basal channels
+%% Sub-Ice: DEM-based semi-automated mapping of ice shelf basal channels
 %  Algorithm that returns ice shelf basal channels' centerline, outlines
 %  and cross sectional profiles; based on surface expressions in a DEM. 
 %  This script maps one or more channels given a single DEM and user
-%  identified channel start and end points. (See "map_channel_timeseries.m"
-%  for mapping a single channel over different DEMs.)
+%  identified channel start and end points, or existing channel centerlines
+%  (e.g. selected from a previous run). (See "map_channel_timeseries.m" for
+%  mapping a single channel over different DEMs.)
+% 
+%  Ensemble mode: if sets of values are given for any of the centerline
+%  search parameters in config.m, centerlines are mapped for every
+%  combination of values (full-factorial ensemble). Only centerlines that
+%  connect start and end point are kept, and written to a single shapefile
+%  incl. their search parameters. The script then stops: select a
+%  centerline per channel (e.g. by visual inspection) and run again with
+%  start_end_method = 4 to extract profiles and edges.
 % 
 %  Input: 
 %   - DEM (GeoTIFF) 
-%   - channel start and end points (through GUI or read from shapefile)
+%   - channel start and end points (through GUI or read from shapefile), or
+%     channel centerlines (shapefile)
 % 
 %  Output: 
 %   - channel centerlines and outlines (figures and georeferenced shapefiles)
-%   - cross sectional elevation/depth profiles (figures)
-%   - channel depth and width along centerlines (figures)
+%     (ensemble mode: centerline ensemble only)
+%   - cross sectional elevation/depth profiles (figures and tables)
+%   - channel depth and width along centerlines (figures and tables)
+%   - summary of channel metrics (table)
 % 
 %  (c) Dylan Kreynen
 %  University of Oslo
@@ -30,68 +42,61 @@ clc
 
 %% run configuration file - set user specifiable parameters
 %  contains filepaths to input/output data, sets method to select channel
-%  start/end points, configures centerline search parameters, output 
-%  behaviour etc. > update configuration file as required! 
+%  start/end points, configures centerline search parameters, output
+%  behaviour etc. > update configuration file as required!
+%  (default: config.m; when run from run_batch.m: the configuration file
+%  passed on by run_batch.m)
 
-run 'config.m'
+config_fn = 'config.m';
+if isappdata(groot, 'subice_config_fn')
+    config_fn = getappdata(groot, 'subice_config_fn');
+    rmappdata(groot, 'subice_config_fn')    % (applies to this run only)
+end
+disp(append("Running Sub-Ice with configuration file ", config_fn, ". "))
+% (evaluated in the current folder: relative paths in the configuration
+% file are relative to the Sub-Ice folder, wherever the file is stored)
+eval(fileread(config_fn))
+
+% check configuration: default values for missing settings, clear messages
+% for mistakes, create output directories (see functions/check_config.m)
+addpath("./functions")
+subice_mode = "single"; 
+check_config
+
+% ensemble mode if sets of values are given for any of the search parameters
+ensemble_mode = any(cellfun(@numel, {window_DEM, search_step, search_angle, max_gradient, window_cent}) > 1); 
+if ensemble_mode && start_end_method == 4
+    error("Ensemble mode (sets of centerline search parameters in the configuration file) requires a centerline search: set start_end_method to 1, 2 or 3. ")
+end
 
 
 %% read DEM from GeoTIFF
 %  and smooth if required
 
-if path_to_DEM(end-3:end) ~= ".tif"
-    error("path_to_DEM should point to a single DEM .tif file (check in config.m). ")
-end
-
-% read from geotiff
-[DEM, R] = readgeoraster(path_to_DEM);
+% read from GeoTIFF, no data values set to NaN (see read_dem())
+[DEM, R] = read_dem(path_to_DEM, DEM_nodata);
 res = R.CellExtentInWorldX;     % resolution of DEM [m]
+disp("Loaded DEM. ")
 
-% replace no data with NaN
-DEM(DEM==DEM_nodata) = NaN; 
-
-% check if smoothed version of DEM exists
-% if it exists: load
-% if not: smooth DEM (and save)
-if window_DEM ~= 0
-    % smoothing requested by user
-    fn_smooth = append(path_to_DEM(1:end-4), '_smooth_', string(window_DEM)', '.mat'); 
-    window = ceil(window_DEM/res);  % from [m] to [pix]
-    try 
-        DEM_smooth = load(fn_smooth).DEM_smooth; 
-        disp(append("Loaded smoothed version of DEM from disk: ", fn_smooth, " Window size: ", string(window_DEM), " [m] (ca. ", string(window), " [pix]). "))
-    catch
-        disp(append("Could not find smoothed version of DEM. Smoothing now. Window size: ", string(window_DEM), " [m] (ca. ", string(window), " [pix]). "))
-        DEM_smooth = smoothdata2(DEM, 'movmean', window, 'omitnan'); 
-        save(fn_smooth, 'DEM_smooth'); 
-    end
-   
-    % test: check if DEM dimensions agree
-    if size(DEM) ~= size(DEM_smooth)
-        error("Dimensions of DEM and smoothed version do not agree. ")
-    end
-
-else
-    % no smoothing requested
-    DEM_smooth = DEM; 
-    disp("Loaded DEM, no smoothing requested. ")
+% smooth DEM for centerline mapping, if requested
+% (smoothed DEM is cached to disk and loaded from there in subsequent runs;
+% in ensemble mode: for every value of window_DEM, see below)
+if ~ensemble_mode && start_end_method ~= 4
+    DEM_smooth = smooth_dem(DEM, res, window_DEM, path_to_DEM);
 end
 
 
 %% specify channel centerline start/end points
 %  have user click on channel start and end points through GUI, read start
-%  and end points from shapefile or enter img coordinates manually
+%  and end points from shapefile or enter img coordinates manually; or load
+%  existing channel centerlines from shapefile
 
-% color limits for visualisation (update as required)
-clims = [-20 80];              % [m]
+% figure style (colors, font sizes; see fig_style())
+sty = fig_style(); 
 
+% map of the DEM, to show start/end points (see plot_map_base())
 figure(1)
-imagesc(DEM, clims)
-hold on
-axis image
-colormap gray
-xlabel('x coord [pix]')
-ylabel('y coord [pix]')
+plot_map_base(gca, DEM, R, 'clims', map_clims, 'hillshade', map_hillshade); 
 text_offs = 3;  % [pix]
 
 if start_end_method == 1 
@@ -126,7 +131,7 @@ if start_end_method == 1
     
     no_channels = c; 
     disp(append("Entered ", string(no_channels), " channels' start and end points. "))
-    channel_label = strings(no_channels);
+    channel_label = strings(no_channels, 1);
     for c = 1:no_channels
         channel_label(c) = string(input(append("Provide a label for channel ", string(c), ': '), 's'));
     end
@@ -138,7 +143,17 @@ elseif start_end_method == 2
     S = shaperead(path_to_start_end_shp); 
     % filter on "shelf" field
     if ~isempty(shelf_filter)
+        if ~isfield(S, 'Shelf')
+            error(append("shelf_filter is set ('", string(shelf_filter), "'), but the start/end point shapefile has no ""Shelf"" attribute ", ...
+                "(attributes: ", strjoin(setdiff(fieldnames(S), ["Geometry", "BoundingBox", "X", "Y"], 'stable'), ", "), "). ", ...
+                "Set shelf_filter = '' in the configuration file to use all points. "))
+        end
+        shelf_values = unique(string({S.Shelf}));
         S = S(strcmp({S.Shelf}, shelf_filter));
+        if isempty(S)
+            error(append("No start/end points with Shelf = '", string(shelf_filter), "' in ", path_to_start_end_shp, ...
+                " (values found: ", strjoin(shelf_values, ", "), "). "))
+        end
     end
     [x_startend, y_startend] =  worldToIntrinsic(R, vertcat(S.X), vertcat(S.Y));
     
@@ -150,7 +165,8 @@ elseif start_end_method == 2
         P_start = [x_startend(~even_idx), y_startend(~even_idx)]; 
         P_end = [x_startend(even_idx), y_startend(even_idx)]; 
     else
-        error('Found odd number of start and end points in shapefile. Please provide an even number of points, ordered channel start, end respectively. '); 
+        error(append("Found an odd number of start and end points (", string(length(x_startend)), ") in ", path_to_start_end_shp, ". ", ...
+            "Points should be ordered start, end, start, end, ... (one pair per channel); a missing point would mix up all following pairs, so please check the shapefile. ")); 
     end 
 
     scatter(P_start(:,1), P_start(:,2), 'm', 'filled')
@@ -164,34 +180,234 @@ elseif start_end_method == 2
     % channel label - feel free to adjust: 
     channel_label = append("channel-", string(1:no_channels)); 
     % (should be string)
+
+    % attributes of start points (e.g. qualitative flags added by the
+    % user), carried over to the centerline shapefile
+    % (start and end point of a channel are assumed to share attributes)
+    attr_startend = struct2table(S(~even_idx), 'AsArray', true);
+    attr_startend = removevars(attr_startend, intersect(attr_startend.Properties.VariableNames, {'Geometry', 'BoundingBox', 'X', 'Y'}));
     
     
 elseif start_end_method == 3
-    % enter start/end points manually below
-    P_start = [353, 128];    % x, y in image coord [pix]
-    P_end = [260, 84];       % x, y in image coord [pix]
+    % start/end points given in the configuration file (start_end_points,
+    % map coordinates: [x_start y_start x_end y_end], one row per channel)
+    [P_start(:,1), P_start(:,2)] = worldToIntrinsic(R, start_end_points(:,1), start_end_points(:,2)); 
+    [P_end(:,1), P_end(:,2)] = worldToIntrinsic(R, start_end_points(:,3), start_end_points(:,4)); 
     scatter(P_start(:,1), P_start(:,2), 'm', 'filled')
     scatter(P_end(:,1), P_end(:,2), 'm', 'filled')
     text(P_start(:,1) + text_offs, P_start(:,2) + text_offs, 'start', 'Color', 'm')
     text(P_end(:,1) + text_offs, P_end(:,2) + text_offs, 'end', 'Color', 'm')
-    
+
+    no_channels = size(P_start, 1); 
+    channel_label = append("channel-", string(1:no_channels)); 
+
+
+elseif start_end_method == 4
+    % load existing centerlines from line shapefile (no centerline search)
+    % only works if shapefile has same map projection as DEM!
+    S = shaperead(path_to_centerline_shp); 
+    no_channels = length(S); 
+
+    x_load = cell(no_channels, 1); 
+    y_load = cell(no_channels, 1); 
+    for c = 1:no_channels
+        % strip NaN part separators and convert to img coordinates
+        if sum(isnan(S(c).X(1:end-1))) > 0
+            disp(append("Warning: centerline ", string(c), " in shapefile consists of multiple parts. Parts are joined. "))
+        end
+        valid = ~isnan(S(c).X) & ~isnan(S(c).Y); 
+        [x_load{c}, y_load{c}] = worldToIntrinsic(R, S(c).X(valid)', S(c).Y(valid)'); 
+    end
+    P_start = cell2mat(cellfun(@(x, y) [x(1), y(1)], x_load, y_load, 'UniformOutput', false)); 
+    P_end = cell2mat(cellfun(@(x, y) [x(end), y(end)], x_load, y_load, 'UniformOutput', false)); 
+
+    % channel label from attribute table, if available (first attribute
+    % starting with "channel"; field names are truncated on write)
+    attr_startend = struct2table(S, 'AsArray', true);
+    attr_startend = removevars(attr_startend, intersect(attr_startend.Properties.VariableNames, {'Geometry', 'BoundingBox', 'X', 'Y'}));
+    label_field = attr_startend.Properties.VariableNames(startsWith(attr_startend.Properties.VariableNames, "channel", 'IgnoreCase', true)); 
+    if isempty(label_field)
+        channel_label = append("channel-", string(1:no_channels)); 
+    else
+        channel_label = string(attr_startend.(label_field{1}))'; 
+        attr_startend = removevars(attr_startend, label_field{1}); % (written separately)
+    end
+    % (other attributes, e.g. search parameters, are carried over to the
+    % output shapefile)
+
+    scatter(P_start(:,1), P_start(:,2), 'm', 'filled')
+    scatter(P_end(:,1), P_end(:,2), 'm', 'filled')
+    text(P_start(:,1) + text_offs, P_start(:,2) + text_offs, 'start', 'Color', 'm')
+    text(P_end(:,1) + text_offs, P_end(:,2) + text_offs, 'end', 'Color', 'm')
+
+    disp(append("Loaded ", string(no_channels), " channel centerlines from shapefile. "))
+
+
 else
-    error('Specify a valid method to enter channel start/end points (under "user specifiable variables" in config.m). ')
+    error('Specify a valid method to enter channel start/end points (start_end_method in the configuration file). ')
+end
+
+% no start point attributes, unless read from shapefile
+if ~exist('attr_startend', 'var')
+    attr_startend = table('Size', [no_channels 0], 'VariableTypes', {});
+end
+
+% exclude channels, if requested
+keep = true(1, no_channels); 
+if ~isempty(excl_channel_labels)
+    keep = ~ismember(channel_label, excl_channel_labels);
+    disp(append("Excluding ", string(sum(~keep)), " channel(s): ", strjoin(channel_label(~keep), ", "), ". "))
+    excl_unknown = setdiff(string(excl_channel_labels), channel_label, 'stable');
+    if ~isempty(excl_unknown)
+        disp(append("Warning: excl_channel_labels contains label(s) that match no channel: ", strjoin(excl_unknown, ", "), ...
+            " (channel labels: ", strjoin(channel_label, ", "), "). "))
+    end
+    if ~any(keep)
+        error("All channels are excluded (excl_channel_labels in the configuration file): nothing to map. ")
+    end
+end
+
+% check start and end points against the DEM: skip channels with points
+% outside the DEM, warn for points on no data or a different projection
+% (see check_points())
+shp_in = ""; 
+if start_end_method == 2, shp_in = path_to_start_end_shp; end
+if start_end_method == 4, shp_in = path_to_centerline_shp; end
+keep(keep) = check_points(R, P_start(keep,1), P_start(keep,2), P_end(keep,1), P_end(keep,2), channel_label(keep), ...
+    'DEM', DEM, 'shp', shp_in); 
+
+if any(~keep)
+    P_start = P_start(keep, :); 
+    P_end = P_end(keep, :); 
+    channel_label = channel_label(keep); 
+    attr_startend = attr_startend(keep, :); 
+    if start_end_method == 4
+        x_load = x_load(keep); 
+        y_load = y_load(keep); 
+    end
+    no_channels = sum(keep); 
+end
+
+
+%% ensemble mode: map centerline ensemble
+%  one centerline per channel for every combination of search parameter
+%  values; keep those that connect start and end point; write to file; stop
+
+if ensemble_mode
+
+    % all combinations of search parameter values (full-factorial ensemble)
+    [g_step, g_angle, g_grad, g_wcent] = ndgrid(search_step, search_angle, max_gradient, window_cent); 
+    no_comb = numel(g_step); 
+    no_members = no_comb*numel(window_DEM); 
+    disp(append("Ensemble mode: mapping ", string(no_members), " centerline realizations for each of ", string(no_channels), " channels. "))
+    if ~save_shps
+        disp("Warning: save_shps = 0, the centerline ensemble will not be written to file. ")
+    end
+
+    % store realizations that connect start and end point
+    ens_x = {}; 
+    ens_y = {}; 
+    ens_channel = []; 
+    ens_info = struct([]); 
+    ens_set = []; 
+    no_success = zeros(no_channels, 1); 
+
+    member = 0; 
+    for w = 1:numel(window_DEM)
+        DEM_smooth = smooth_dem(DEM, res, window_DEM(w), path_to_DEM);
+        for k = 1:no_comb
+            member = member + 1; 
+            no_connected = 0; 
+            for c = 1:no_channels
+                [x_c, y_c, ~, info_c] = find_centerline(P_start(c,:), P_end(c,:), DEM_smooth, R, ... 
+                                                    'search_step',      g_step(k), ... 
+                                                    'search_angle',     g_angle(k), ... 
+                                                    'max_gradient',     g_grad(k), ... 
+                                                    'window',           g_wcent(k), ...
+                                                    'max_recursions',   max_recursions, ...
+                                                    'verbose',          false); 
+                if info_c.end_found
+                    no_connected = no_connected + 1; 
+                    ens_x{end+1, 1} = x_c; 
+                    ens_y{end+1, 1} = y_c; 
+                    ens_channel(end+1, 1) = c; 
+                    info_c.win_dem = window_DEM(w); 
+                    ens_info = [ens_info; info_c]; 
+                    % configured (not perturbed) parameter values and member no.
+                    ens_set(end+1, :) = [member, window_DEM(w), g_step(k), g_angle(k), g_grad(k), g_wcent(k)]; 
+                    no_success(c) = no_success(c) + 1; 
+                end
+            end
+            disp(append("Ensemble member ", string(member), "/", string(no_members), ...
+                " (window_DEM = ", string(window_DEM(w)), ", search_step = ", string(g_step(k)), ", search_angle = ", string(g_angle(k)), ...
+                ", max_gradient = ", string(g_grad(k)), ", window_cent = ", string(g_wcent(k)), "): ", ...
+                string(no_connected), "/", string(no_channels), " channels connected. "))
+        end
+    end
+
+    % success rate per channel
+    disp("Ensemble realizations connecting start and end point, per channel: ")
+    T_success = table(channel_label(:), no_success, repmat(no_members, no_channels, 1), round(100*no_success/no_members, 1), ...
+        'VariableNames', {'channel', 'no_realizations', 'no_members', 'success_rate_pct'}); 
+    disp(T_success)
+    if save_tables
+        writetable(T_success, append(tab_dir, file_prefix, 'centerline_ensemble_success.csv'))
+    end
+
+    % overview figure: all realizations, one color per channel, on the DEM
+    % (map extent: realizations and start/end points, plus a margin)
+    f = figure(1); 
+    clf(f)
+    ax_map = axes(f); 
+    all_x = [vertcat(ens_x{:}); P_start(:,1); P_end(:,1)]; 
+    all_y = [vertcat(ens_y{:}); P_start(:,2); P_end(:,2)]; 
+    margin = 0.1*max(max(all_x) - min(all_x), max(all_y) - min(all_y)); 
+    plot_map_base(ax_map, DEM, R, 'clims', map_clims, 'hillshade', map_hillshade, ...
+        'extent', [min(all_x)-margin, max(all_x)+margin, min(all_y)-margin, max(all_y)+margin]); 
+    ch_cols = sty.cmap_channels(no_channels); 
+    for e = 1:numel(ens_x)
+        plot(ax_map, ens_x{e}, ens_y{e}, 'Color', [ch_cols(ens_channel(e),:) 0.6], 'LineWidth', sty.lw_thin, 'HandleVisibility', 'off')
+    end
+    scatter(ax_map, [P_start(:,1); P_end(:,1)], [P_start(:,2); P_end(:,2)], 12, sty.ink, 'filled', 'HandleVisibility', 'off')
+    for c = 1:no_channels
+        text(ax_map, P_start(c,1), P_start(c,2), append(" ", channel_label(c), " "), 'Color', sty.label, ...
+            'FontSize', sty.font_small, 'BackgroundColor', 'w', 'Margin', 0.5, 'Interpreter', 'none', ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom')
+    end
+    panel_title(ax_map, "Centerline ensemble", append(string(numel(ens_x)), " realizations connecting start and end point (", ...
+        string(no_members), " parameter combinations x ", string(no_channels), " channels)"))
+
+    if save_figs
+        fn = append(fig_dir, file_prefix, 'centerline_ensemble'); 
+        print(f, fn, figs_filetype, figs_resolution)
+    end
+
+    % write ensemble to shapefile: all realizations of all channels in one
+    % file, ordered by channel; attributes: start point attributes (if any),
+    % search parameters actually used (incl. retries, see find_centerline()),
+    % ensemble member no. and the configured parameter values of the member
+    if save_shps && ~isempty(ens_x)
+        [~, order] = sort(ens_channel); 
+        info = struct2table(ens_info(order), 'AsArray', true);
+        info = renamevars(info, ["search_step", "search_angle", "max_gradient", "window"], ...
+            ["step_m", "angle_deg", "max_grad", "win_cent"]);
+        set_info = array2table(ens_set(order, :), 'VariableNames', ...
+            ["member", "set_wdem", "set_step", "set_angle", "set_grad", "set_wcent"]); 
+        attr = [attr_startend(ens_channel(order), :), info, set_info];
+        fn = append(shp_dir, file_prefix, 'centerline_ensemble'); 
+        lines_to_shp(ens_x(order), ens_y(order), R, fn, 'channel_label', num2cell(channel_label(ens_channel(order))), 'attributes', attr); 
+        disp(append("Wrote centerline ensemble to ", fn, ".shp. "))
+    elseif save_shps
+        disp("No realization connected start and end point, no shapefile written. ")
+    end
+
+    disp("Done! Select a centerline per channel from the ensemble and run again with start_end_method = 4 to extract profiles and channel edges. ")
+    return
 end
 
 
 %% map channel geometries and extract profiles
 %  and visualize on overview figure
-
-f = figure(1); 
-hold off
-imagesc(DEM, clims)
-axis image
-colormap gray
-title('mapped channel geometries (overview)')
-xlabel('x coord [pix]')
-ylabel('y coord [pix]')
-hold on
 
 x_cent = cell(no_channels, 1);  
 y_cent = cell(no_channels, 1); 
@@ -202,33 +418,43 @@ y_prof = cell(no_channels, 1);
 edge_idx = cell(no_channels, 1); 
 edge_coord = cell(no_channels, 1); 
 edge_elev = cell(no_channels, 1); 
+valid_edges = cell(no_channels, 1); 
 fchannel = cell(no_channels, 1);
+cent_info = cell(no_channels, 1); 
 trough_elev = cell(no_channels, 1); 
-trough_depth = cell(no_channels, 1);
-keep_prof = cell(no_channels, 1);
+trough_depth = cell(no_channels, 1); 
+valid_trough = cell(no_channels, 1); 
 
 % to store whether we "successfully" found the channel centerline: 
 channel_status = zeros(no_channels, 1); 
 
 % loop over channels
 for c = 1:no_channels
-    disp(append("Start mapping channel geometry of ", channel_label(c), ". ")) 
-    
-    % find centerline
-    % attention: possibly using smoothed DEM to find centerlines! 
-    [x_cent{c}, y_cent{c}, cent_length] = find_centerline(P_start(c,:), P_end(c,:), DEM_smooth, R, ... 
-                                                'search_step',      search_step, ... 
-                                                'search_angle',     search_angle, ... 
-                                                'max_gradient',     max_gradient, ... 
-                                                'window',           window_cent, ...
-                                                'max_recursions',   max_recursions); 
+    if start_end_method == 4
+        % centerline loaded from shapefile
+        x_cent{c} = x_load{c}; 
+        y_cent{c} = y_load{c}; 
+        cent_length = sqrt(diff(x_cent{c}).^2 + diff(y_cent{c}).^2); 
+        channel_status(c) = 1; 
+
+    else
+        % find centerline
+        % attention: possibly using smoothed DEM to find centerlines! 
+        % (cent_info: search parameters of the (last) attempt, incl. retries)
+        [x_cent{c}, y_cent{c}, cent_length, cent_info{c}] = find_centerline(P_start(c,:), P_end(c,:), DEM_smooth, R, ... 
+                                                    'search_step',      search_step, ... 
+                                                    'search_angle',     search_angle, ... 
+                                                    'max_gradient',     max_gradient, ... 
+                                                    'window',           window_cent, ...
+                                                    'max_recursions',   max_recursions, ...
+                                                    'verbose',          false); 
+
+        % did we reach the channel end point?
+        % (if not, continue with the centerline of the last attempt)
+        channel_status(c) = cent_info{c}.end_found;
+    end
     channel_length{c} = sum(cent_length);       % in [pix]
     channel_length{c} = channel_length{c}*res;  % in [m]
-
-    if ~isnan(channel_length{c})
-        % found channel end
-        channel_status(c) = 1;
-    end
 
     % find cross sectional profiles
     [profiles{c}, x_prof{c}, y_prof{c}] = find_profiles(x_cent{c}, y_cent{c}, DEM, R, ...
@@ -237,7 +463,7 @@ for c = 1:no_channels
     no_profiles = size(profiles{c}, 2); 
 
     % find channel edges/outlines
-    [edge_idx{c}, edge_coord{c}, edge_elev{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
+    [edge_idx{c}, edge_coord{c}, edge_elev{c}, valid_edges{c}] = find_edges(profiles{c}, x_prof{c}, y_prof{c}, res, ...
                                                 'edge_method',      edge_method, ...
                                                 'knee_method',      knee_method, ...
                                                 'min_width',        min_width, ...
@@ -248,76 +474,81 @@ for c = 1:no_channels
                                                 'peak_prom',        peak_prom, ...
                                                 'z_thr_elev',       z_thr_elev, ...
                                                 'z_thr_idx',        z_thr_idx, ...
-                                                'edge_subst_window', edge_subst_window);
+                                                'edge_subst_window', edge_subst_window, ...
+                                                'verbose',          c == 1);     % (messages once, not per channel)
 
     % find channel trough elevation and depth
-    [trough_elev{c}, trough_depth{c}] = find_trough(profiles{c}, edge_elev{c}, ...
+    [trough_elev{c}, trough_depth{c}, valid_trough{c}] = find_trough(profiles{c}, edge_elev{c}, ...
                                                 'z_thr',            z_thr_trough_elev, ...
                                                 'subst_window',     trough_subst_window); 
 
-    channel_width = (edge_idx{c}(:,1)-edge_idx{c}(:,2))*res; % [m]
-
-   
-    % validate all cross sections
-    [keep_prof{c}] = validate_profiles(profiles{c}, res, edge_elev{c}, ... 
-                                                'validation_methods', validation_methods);
-
-    % visualize
-    % profile transects
-    hold on
-    if plot_prof_transects == 1
-        scatter(x_prof{c}(:, keep_prof{c}), y_prof{c}(:, keep_prof{c}), 1, 'w')
-        scatter(x_prof{c}(:, ~keep_prof{c}), y_prof{c}(:, ~keep_prof{c}), 2, 'b')
-    end
-
-    % centerlines
-    scatter(x_cent{c}, y_cent{c}, 15, 'r', 'filled')
-    plot(x_cent{c}, y_cent{c}, 'r')
-    
-    % edges/outlines
-    scatter(edge_coord{c}(:,1), edge_coord{c}(:,2), 15, 'g', 'filled')
-    scatter(edge_coord{c}(:,3), edge_coord{c}(:,4), 15, 'g', 'filled')
-    if plot_edge_gaps == 1
-        lvalid = ~isnan(edge_coord{c}(:,1));
-        rvalid = ~isnan(edge_coord{c}(:,3));
-        plot(edge_coord{c}(lvalid,1), edge_coord{c}(lvalid,2), 'g')
-        plot(edge_coord{c}(rvalid,3), edge_coord{c}(rvalid,4), 'g')
-    else
-        plot(edge_coord{c}(:,1), edge_coord{c}(:,2), 'g')
-        plot(edge_coord{c}(:,3), edge_coord{c}(:,4), 'g')
-    end
-
-    % annotation
-    text(P_start(c,1) + text_offs, P_start(c,2) + text_offs, channel_label(c), 'Color', 'm')
-    pause(0.01) % just to force matlab to plot
-    hold off
     % label for shapefile
     fchannel{c} = channel_label(c); 
-    
+
+    % progress: one line per channel
+    msg = append("Mapped ", channel_label(c), " (", string(c), "/", string(no_channels), "): centerline ", ...
+        string(round(channel_length{c}/1000, 1)), " km, ", string(size(profiles{c}, 2)), " profiles. "); 
+    if ~channel_status(c)
+        msg = append(msg, "Warning: end point not reached, continued with the centerline of the last attempt. "); 
+    end
+    disp(msg)
 end
 
 disp(append("Finished mapping. End point reached for ", string(sum(channel_status)), "/", string(length(channel_status)), " channels. "))
+if any(~channel_status)
+    disp(append("Warning: end point not reached for ", strjoin(channel_label(~channel_status), ", "), ...
+        " (continued with the centerline of the last attempt; check these centerlines, or try other search parameters or ensemble mode). "))
+end
+
+
+%% overview figure
+%  channel centerlines and the area between the channel edges, on the DEM
+%  (map extent: all profiles, plus a margin)
+
+% edge detection method, for the subtitle
+edge_method_txt = string(edge_method); 
+if edge_method ~= "SlopeThreshold"
+    edge_method_txt = append(edge_method_txt, "-", knee_method);   % (knee point method also used by NearPeaks)
+end
+
+f = figure(1); 
+clf(f)
+plot_overview_map(axes(f), DEM, R, x_cent, y_cent, edge_coord, x_prof, y_prof, channel_label, ...
+    'clims', map_clims, 'hillshade', map_hillshade, 'transects', plot_prof_transects == 1, ...
+    'bridge_gaps', plot_edge_gaps == 1, 'title', "Mapped channels", ...
+    'subtitle', append(string(no_channels), " channels, edge detection: ", edge_method_txt))
 
 
 %% write to files
 
-if save_figs || save_shps
-    disp("Writing figure- and shapefiles... ")
+if save_figs || save_shps || save_tables
+    disp("Writing figures, shapefiles and/or tables... ")
 
     % print overview figure to file
     if save_figs
-        %f.WindowState = 'maximized'; % make figure fullscreen before saving
         fn = append(fig_dir, file_prefix, 'mapped_channels'); 
-        print(fn, figs_filetype, figs_resolution)
-        %f.WindowState = 'normal'; 
+        print(f, fn, figs_filetype, figs_resolution)
     end
     
     % write mapped geometries to shapefile
     if save_shps
     
         % all centerlines in a single file
+        % attributes: start point attributes (if any), whether the end
+        % point was reached, and the search parameters actually used
+        % (those of the successful attempt, incl. retries, see find_centerline())
+        % (for loaded centerlines: the attributes of the input shapefile)
+        if start_end_method == 4
+            attr = attr_startend; 
+        else
+            info = struct2table(vertcat(cent_info{:}), 'AsArray', true);
+            info = renamevars(info, info.Properties.VariableNames, ...
+                ["step_m", "angle_deg", "max_grad", "win_cent", "reversed", "perturbed", "attempt", "end_found"]);
+            info.win_dem = repmat(window_DEM, no_channels, 1);
+            attr = [attr_startend, info];
+        end
         fn = append(shp_dir, file_prefix, 'all_centerlines'); 
-        lines_to_shp(x_cent, y_cent, R, fn, 'channel_label', fchannel); 
+        lines_to_shp(x_cent, y_cent, R, fn, 'channel_label', fchannel, 'attributes', attr); 
         
         % centerlines and outlines in one file per channel
         for c = 1:no_channels
@@ -343,6 +574,30 @@ if save_figs || save_shps
         end 
     end
 
+    % write profiles and channel metrics to tables (.csv)
+    if save_tables
+        T_sum = table(); 
+        for c = 1:no_channels
+            % channel metrics per profile (see channel_metrics())
+            T = channel_metrics(x_cent{c}, y_cent{c}, x_prof{c}, y_prof{c}, ...
+                edge_idx{c}, edge_coord{c}, edge_elev{c}, valid_edges{c}, ...
+                trough_elev{c}, valid_trough{c}, R, prof_interval); 
+            writetable(T, append(tab_dir, file_prefix, channel_label(c), '_metrics.csv'))
+
+            % cross sectional profile elevations: one column per profile,
+            % first column: distance from profile center [m] (positive =
+            % left side, looking downstream)
+            prof_dist = ((1:size(profiles{c}, 1))' - (size(profiles{c}, 1)+1)/2)*res; 
+            T_prof = array2table([prof_dist, profiles{c}], 'VariableNames', ...
+                ["dist_center_m", append("prof_", string(1:size(profiles{c}, 2)))]); 
+            writetable(T_prof, append(tab_dir, file_prefix, channel_label(c), '_profiles.csv'))
+
+            % summary statistics per channel
+            T_sum = [T_sum; channel_summary(T, channel_label(c), channel_status(c), channel_length{c})]; 
+        end
+        writetable(T_sum, append(tab_dir, file_prefix, 'channel_summary.csv'))
+    end
+
     disp(append("Done writing files. Check '", append(results_dir, proj_subdir), "' for output. "))
 end
 
@@ -352,164 +607,139 @@ end
 
 if ext_figs
 disp("Creating and possibly saving extended figures. Sit tight. ")
-    
+    T_along = cell(no_channels, 1);     % channel metrics per profile, per channel
+
+    % when one_fig_per_type = 1 and there is more than one channel: pre-create
+    % a tiled figure for each profile figure type so all channels share one window
+    use_combined = one_fig_per_type && no_channels > 1;
+    if use_combined
+        if plot_across_absh
+            f_absh_all = new_figure([18, 8*no_channels], save_figs);
+            tl_absh = tiledlayout(f_absh_all, no_channels, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+        end
+        if plot_across_depth
+            f_depth_all = new_figure([18, 8*no_channels], save_figs);
+            tl_depth = tiledlayout(f_depth_all, no_channels, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+        end
+    end
+
     for c = 1:no_channels
-        
-        % filter array based on validation
-        all_profiles = profiles{c};
-        profiles{c} = all_profiles(:, keep_prof{c});
-        all_edge_idx = edge_idx{c};
-        edge_idx{c} = all_edge_idx(keep_prof{c}, :);
-        all_edge_elev = edge_elev{c};
-        edge_elev{c} = all_edge_elev(keep_prof{c}, :);
-        all_trough_elev = trough_elev{c};
-        trough_elev{c} = all_trough_elev(keep_prof{c}, :);
-        all_trough_depth = trough_depth{c};
-        trough_depth{c} = all_trough_depth(keep_prof{c}, :);
 
         % cross sectional profiles
-        no_profiles = size(profiles{c}, 2); 
-        
-        % for plotting profiles with [m] on x-axis
-        prof_dist_vector = (1:size(profiles{c}, 1))*res; 
-        prof_dist_vector = prof_dist_vector - mean(prof_dist_vector);
-        valid_l = ~isnan(edge_idx{c}(:,1));
-        valid_r = ~isnan(edge_idx{c}(:,2));
-        ledge_pos = NaN(no_profiles, 1);
-        redge_pos = NaN(no_profiles, 1);
-        ledge_pos(valid_l) = prof_dist_vector(edge_idx{c}(valid_l, 1)');
-        redge_pos(valid_r) = prof_dist_vector(edge_idx{c}(valid_r, 2)');
-        edge_pos_vector = [ledge_pos(:), redge_pos(:)];
+        no_profiles = size(profiles{c}, 2);
 
-        % color gradient shared across both profile figures
-        cmap = parula(no_profiles);
+        % distance of profile samples from profile center [m] (positive = left)
+        prof_dist_vector = ((1:size(profiles{c}, 1)) - (size(profiles{c}, 1)+1)/2)*res;
 
-        % full cross sectional profiles using absolute elevation
-        figure
-        hold on
-        set(gca(), 'ColorOrder', cmap)
-        plot(prof_dist_vector, profiles{c}, 'LineWidth', 3)
-        xlabel('distance from profile center [m]')
-        ylabel('elevation [m]')
-        title(append(channel_label(c), ' cross sectional profiles (full, abs. heights)'))
-        hcb = colorbar;
-        title(hcb, 'norm. dist. along channel [-]')
-        plot(edge_pos_vector, edge_elev{c}, 'o', 'MarkerFaceColor', 'g', 'MarkerEdgeColor', 'w', 'MarkerSize', 7)
-        if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev');
-            print(fn, figs_filetype, figs_resolution)
-        end
-
-        % between channel edges using relative elevation (depth w.r.t. left channel edge)
-        figure
-        hold on
-        for i = 1:no_profiles
-            if isnan(edge_idx{c}(i,1)) || isnan(edge_idx{c}(i,2))
-                continue
+        % full cross sectional profiles, absolute elevation
+        % (extended figures: not shown when saved to file, else docked; see new_figure())
+        if plot_across_absh
+            if use_combined
+                ax = nexttile(tl_absh);
+            else
+                f_ext = new_figure([18 10], save_figs);
+                ax = axes(f_ext);
             end
+            plot_profile_figure(ax, prof_dist_vector, profiles{c}, edge_idx{c}, edge_elev{c}, ...
+                'title', channel_label(c), ...
+                'subtitle', append("Cross-sectional profiles (", string(no_profiles), "), looking upstream"), ...
+                'min_width', min_width, 'max_width', max_width)
 
-            prof = profiles{c}(:,i);
-
-            % replace values outside of channel edges to NaN (keep edge points)
-            prof(1:edge_idx{c}(i,2)-1) = NaN;
-            prof(edge_idx{c}(i,1)+1:end) = NaN;
-
-            % from absolute height to depth below left channel edge
-            prof = prof - edge_elev{c}(i,1);
-
-            plot(prof_dist_vector, prof, 'Color', cmap(i,:), 'LineWidth', 3)
+            if save_figs && ~use_combined
+                fn = append(fig_dir, file_prefix, channel_label(c), '_full_profiles_elev');
+                print(f_ext, fn, figs_filetype, figs_resolution)
+                close(f_ext)
+            end
         end
-        xlabel('distance from profile center [m]')
-        ylabel('depth [m]')
-        title(append(channel_label(c), ' channel cross sectional profiles (depth below left edge)'))
-        hcb = colorbar;
-        title(hcb, 'norm. dist. along profile [-]')
 
-        if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_lim_profiles_depth'); 
-            print(fn, figs_filetype, figs_resolution)
+        % cross sectional profiles between the channel edges, relative to
+        % the left channel edge
+        if plot_across_depth
+            if use_combined
+                ax = nexttile(tl_depth);
+            else
+                f_ext = new_figure([18 10], save_figs);
+                ax = axes(f_ext);
+            end
+            plot_profile_figure(ax, prof_dist_vector, profiles{c}, edge_idx{c}, edge_elev{c}, ...
+                'relative', true, 'title', channel_label(c), ...
+                'subtitle', append("Cross-sectional profiles between the channel edges, looking upstream; mean depth below left edge: ", ...
+                    string(round(mean(edge_elev{c}(:,1) - trough_elev{c}, 'omitnan'), 1)), " m"), ...
+                'min_width', min_width, 'max_width', max_width)
+
+            if save_figs && ~use_combined
+                fn = append(fig_dir, file_prefix, channel_label(c), '_lim_profiles_depth');
+                print(f_ext, fn, figs_filetype, figs_resolution)
+                close(f_ext)
+            end
         end
-        
-        
-        % plotting some metrics along channel length
-        norm_dist_vector = (1:no_profiles)./no_profiles; 
-        
-        figure(10)
-        hold on
-        plot(norm_dist_vector*channel_length{c}/1000, mean(profiles{c}))
-        
-        channel_width = (edge_idx{c}(:,1)-edge_idx{c}(:,2))*res; % [m]
-        
-        figure(11)
-        hold on
-        plot(norm_dist_vector*channel_length{c}/1000, trough_depth{c}*1)
-        
-        figure(12)
-        hold on
-        plot(norm_dist_vector*channel_length{c}/1000, channel_width/1000)
 
-        % edge and trough elevation and depth along channel (one figure per channel)
-        figure
+        % channel geometry along the channel (one figure per channel)
+        % (metrics per profile, see channel_metrics())
+        T_along{c} = channel_metrics(x_cent{c}, y_cent{c}, x_prof{c}, y_prof{c}, ...
+            edge_idx{c}, edge_coord{c}, edge_elev{c}, valid_edges{c}, ...
+            trough_elev{c}, valid_trough{c}, R, prof_interval);
 
-        subplot(2, 1, 1)
-        hold on
-        plot(norm_dist_vector*channel_length{c}/1000, edge_elev{c}(:,1), 'Color', [0.0 0.6 0.0])
-        plot(norm_dist_vector*channel_length{c}/1000, edge_elev{c}(:,2), 'Color', [0.4 0.8 0.4])
-        plot(norm_dist_vector*channel_length{c}/1000, trough_elev{c},    'r')
-        ylabel('elevation [m]')
-        title(append(channel_label(c), ' edge and trough elevation along channel'))
-        legend('left edge', 'right edge', 'trough')
+        if plot_along_per_channel
+            f_along = new_figure([18 13], save_figs);
+            plot_along_channel_figure(f_along, T_along{c}, channel_label(c))
 
-        subplot(2, 1, 2)
-        hold on
-        plot(norm_dist_vector*channel_length{c}/1000, zeros(no_profiles, 1),                    'Color', [0.0 0.6 0.0])
-        plot(norm_dist_vector*channel_length{c}/1000, edge_elev{c}(:,2) - edge_elev{c}(:,1),   'Color', [0.4 0.8 0.4])
-        plot(norm_dist_vector*channel_length{c}/1000, trough_depth{c},                          'r')
-        xlabel('distance along channel [km]')
-        ylabel('depth w.r.t. left edge [m]')
-        legend('left edge', 'right edge', 'trough')
-
-        if save_figs
-            fn = append(fig_dir, file_prefix, channel_label(c), '_edge_trough_along_channel');
-            print(fn, figs_filetype, figs_resolution)
+            if save_figs
+                fn = append(fig_dir, file_prefix, channel_label(c), '_along_channel');
+                print(f_along, fn, figs_filetype, figs_resolution)
+                close(f_along)
+            end
         end
     end
-    
-    figure(10)
-    ylabel('elevation [m]')
-    xlabel('distance along channel [km]')
-    title('mean profile elevation (full) vs. distance along channel')
-    legend(channel_label)
-    
-    if save_figs
-        fn = append(fig_dir, file_prefix, 'elev_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
+
+    % save combined profile figures (produced outside the channel loop)
+    if use_combined
+        if plot_across_absh && save_figs
+            fn = append(fig_dir, file_prefix, 'all_channels_full_profiles_elev');
+            print(f_absh_all, fn, figs_filetype, figs_resolution)
+            close(f_absh_all)
+        end
+        if plot_across_depth && save_figs
+            fn = append(fig_dir, file_prefix, 'all_channels_lim_profiles_depth');
+            print(f_depth_all, fn, figs_filetype, figs_resolution)
+            close(f_depth_all)
+        end
     end
-    
-    
-    figure(11)
-    ylabel('depth w.r.t. left channel edge [m]')
-    xlabel('distance along channel [km]')
-    title('channel depth vs. distance along channel')
-    legend(channel_label)
-    
+
+    % all channels together: mean profile elevation, depth and width along
+    % the channel (one color per channel)
+    f_all = new_figure([18 16], save_figs);
+    plot_along_all_figure(f_all, T_along, cellfun(@(P) mean(P, 1, 'omitnan')', profiles, 'UniformOutput', false), ...
+        channel_label, 'title', "All channels", 'subtitle', "Mean profile elevation, depth and width along the channel")
+
     if save_figs
-        fn = append(fig_dir, file_prefix, 'depth_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
+        fn = append(fig_dir, file_prefix, 'all_channels_along_channel');
+        print(f_all, fn, figs_filetype, figs_resolution)
+        close(f_all)
     end
-    
-    
-    figure(12)
-    ylabel('channel width [km]')
-    xlabel('distance along channel [km]')
-    title('channel width vs. distance along channel')
-    legend(channel_label)
-    
-    if save_figs
-        fn = append(fig_dir, file_prefix, 'width_vs_distance_along_channel'); 
-        print(fn, figs_filetype, figs_resolution)
+
+end
+
+
+%% channel atlas
+%  one page per channel (map, profiles, elevation, width and depth along
+%  the channel), always written to fig_dir/atlas/ without opening windows
+
+if create_channel_atlas
+    disp(append("Creating channel atlas in ", atlas_dir, ". "))
+    for c = 1:no_channels
+        T_atlas = channel_metrics(x_cent{c}, y_cent{c}, x_prof{c}, y_prof{c}, ...
+            edge_idx{c}, edge_coord{c}, edge_elev{c}, valid_edges{c}, ...
+            trough_elev{c}, valid_trough{c}, R, prof_interval);
+        f_atl = new_figure([24 17], true);
+        plot_channel_atlas_page(f_atl, DEM, R, x_cent{c}, y_cent{c}, edge_coord{c}, x_prof{c}, y_prof{c}, ...
+            profiles{c}, edge_idx{c}, edge_elev{c}, T_atlas, channel_label(c), ...
+            'subtitle', append("Edge detection: ", edge_method_txt), ...
+            'clims', map_clims, 'hillshade', map_hillshade, 'transects', plot_prof_transects == 1, ...
+            'bridge_gaps', plot_edge_gaps == 1, 'min_width', min_width, 'max_width', max_width)
+        print(f_atl, append(atlas_dir, file_prefix, channel_label(c)), figs_filetype, figs_resolution)
+        close(f_atl)
     end
-    
 end
     
 disp("Done! ")
