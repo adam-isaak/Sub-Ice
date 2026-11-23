@@ -20,12 +20,12 @@ clc
 %% Inputs
 input_path = "./config.m";     % Input config file or folder specifiyin the location of the configuration files to run multiple
 
-map_timeseries = 0;             % Control for whehter it should run a timeseries or not
+map_timeseries = 0;             % Control for whether it should run a timeseries or not
 
 % folder controls
 config_match = "^config.*\.m$";     % Regex statement to match the config file
                                     % e.g. "^config.*\.m$" matches to any files that begin with "config" and end in ".m"
-recursive = 1;                      % Whether or not if it is a folder we should look for any config files in sub-folders, and their sub folders
+recursive = 0;                      % Whether or not if it is a folder we should look for any config files in sub-folders, and their sub folders
 
 %% Overides
 % overides default config variables when running through multiple configs

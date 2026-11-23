@@ -27,7 +27,7 @@
 %% read DEM from GeoTIFF
 %  and smooth if required
 
-if path_to_DEM(end-3:end) ~= ".tif"
+if path_to_DEM(end-3:end) ~= ".tif" & path_to_DEM(end-4:end) ~= ".tiff"
     error("path_to_DEM should point to a single DEM .tif file (check in config.m). ")
 end
 
